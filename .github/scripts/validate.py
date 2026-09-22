@@ -64,7 +64,18 @@ def parse_frontmatter(text, path):
     validator runs anywhere with bare Python 3.
     """
     if not text.startswith("---"):
-        err(f"{path}: missing YAML frontmatter")
+        # A leading BOM or zero-width space makes frontmatter silently fail to
+        # parse while still *looking* correct in an editor. Call it out by name.
+        stripped = text.lstrip("\ufeff\u200b\u200c\u200d\u2060")
+        if stripped.startswith("---"):
+            bad = text[: len(text) - len(stripped)]
+            err(
+                f"{path}: file begins with invisible character(s) "
+                f"{[hex(ord(c)) for c in bad]} before the '---' frontmatter "
+                f"delimiter, which breaks YAML parsing. Strip them."
+            )
+        else:
+            err(f"{path}: missing YAML frontmatter")
         return None, None
     end = text.find("\n---", 3)
     if end == -1:
@@ -112,9 +123,20 @@ def check_skill(skill_dir):
         err(f"{rel}: no SKILL.md")
         return
 
-    fm, metadata = parse_frontmatter(
-        open(skill_md, encoding="utf-8").read(), f"{rel}/SKILL.md"
-    )
+    text = open(skill_md, encoding="utf-8").read()
+
+    # Progressive disclosure: name+description load at startup, the body loads on
+    # trigger. An oversized body is a real context cost, so warn (the spec states
+    # this as guidance, not a hard limit — don't fail a working skill over it).
+    nlines = text.count("\n") + 1
+    if nlines > 500:
+        warn(
+            f"{rel}/SKILL.md is {nlines} lines (~{len(text) // 1024}KB); guidance is "
+            f"under ~500. Consider moving detail into references/ for progressive "
+            f"disclosure."
+        )
+
+    fm, metadata = parse_frontmatter(text, f"{rel}/SKILL.md")
     if fm is None:
         return
 

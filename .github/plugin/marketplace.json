@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Agents, skills, and starter kits for Microsoft Discovery (AI for Science)",
-    "version": "0.3.0"
+    "version": "0.4.0"
   },
   "plugins": [
     {
       "name": "discovery-tools",
-      "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Includes discovery-token-usage (mine .discovery/ exhaust for token usage), build-research-paper (build arxiv-ready PDFs), and osti-literature-search (search DOE research via the external osti-axi CLI).",
-      "version": "0.3.0",
+      "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Covers Discovery agent deployment and investigation task design, workspace token-usage mining, arxiv-ready paper builds, and DOE literature retrieval.",
+      "version": "0.4.0",
       "author": {
         "name": "Tim Meyers",
         "url": "https://github.com/timothymeyers"
@@ -33,7 +33,10 @@
         "arxiv",
         "osti",
         "scientific-literature",
-        "literature-search"
+        "literature-search",
+        "discovery-agents",
+        "foundry",
+        "investigation-tasks"
       ],
       "source": {
         "source": "github",

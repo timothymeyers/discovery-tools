@@ -23,6 +23,8 @@ component layout. No symlinks, no duplication, no build step.
 |---|---|---|
 | [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines (Clio / Science Engine, copilot-cli / Mission Control), models, and interactive chat. Handles seven known data-quality traps. Cost reporting is a deliberate opt-in feature flag. |
 | [`build-research-paper`](skills/build-research-paper) | 2 | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures, using `tectonic` (default) or `pandoc` (escape hatch). Ships templates, a scaffolder, build and check scripts, and referee-revision scaffolding. |
+| [`discovery-add-agents`](skills/discovery-add-agents) | 1.16.0 | Adds agents from the public `microsoft/discovery` repo to a workspace, then deploys each to one target: the local Copilot app as `.agent.md` companions, a Microsoft Discovery project + Azure via `UpsertAgent`, or promoting an already-local agent up to Discovery. |
+| [`discovery-design-tasks`](skills/discovery-design-tasks) | 1 | Generates a Microsoft Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
 | [`osti-literature-search`](skills/osti-literature-search) | 1 | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
 
 ### External tools
