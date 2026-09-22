@@ -1,7 +1,7 @@
 {
   "name": "discovery-tools",
-  "version": "0.2.0",
-  "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Includes discovery-token-usage (mine .discovery/ exhaust for per-engine and per-model token usage) and build-research-paper (build arxiv-ready PDFs with tectonic or pandoc).",
+  "version": "0.3.0",
+  "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Includes discovery-token-usage (mine .discovery/ exhaust for token usage), build-research-paper (build arxiv-ready PDFs), and osti-literature-search (search DOE research via the external osti-axi CLI).",
   "author": {
     "name": "Tim Meyers",
     "url": "https://github.com/timothymeyers"
@@ -19,7 +19,10 @@
     "copilot-cli",
     "research-paper",
     "latex",
-    "arxiv"
+    "arxiv",
+    "osti",
+    "scientific-literature",
+    "literature-search"
   ],
   "skills": [
     "skills/"

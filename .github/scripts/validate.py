@@ -243,6 +243,85 @@ def check_manifests():
     print("manifests OK")
 
 
+def check_external_tools():
+    """Lint tools/external-tools.json and enforce it as the source of truth.
+
+    The registry is what makes external tools machine-discoverable, so it is
+    validated strictly, and any pointer skill must agree with its pinned ref.
+    """
+    path = os.path.join(ROOT, "tools", "external-tools.json")
+    if not os.path.isfile(path):
+        return  # optional file
+
+    try:
+        reg = json.load(open(path, encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        err(f"tools/external-tools.json: invalid JSON — {e}")
+        return
+
+    tools = reg.get("tools")
+    if not isinstance(tools, list) or not tools:
+        err("tools/external-tools.json: 'tools' must be a non-empty array")
+        return
+
+    required = ("name", "description", "repository", "license", "author", "install")
+    seen = set()
+
+    for t in tools:
+        n = t.get("name", "<unnamed>")
+        for f in required:
+            if not t.get(f):
+                err(f"external tool {n!r}: missing required field {f!r}")
+
+        if n in seen:
+            err(f"external tool {n!r}: duplicate entry")
+        seen.add(n)
+
+        repo = t.get("repository", "")
+        if repo and not repo.startswith("https://github.com/"):
+            err(f"external tool {n!r}: repository must be an https://github.com/ URL")
+
+        # Pointers must never silently become vendored code.
+        if t.get("bundled") is not False:
+            err(f"external tool {n!r}: 'bundled' must be false — this catalog vendors no third-party code")
+
+        # Anything that installs and executes code must be consent-gated.
+        if t.get("requiresConfirmation") is not True:
+            err(f"external tool {n!r}: 'requiresConfirmation' must be true for external tools")
+
+        install = t.get("install") or {}
+        ref = install.get("sourceRef")
+        if not ref:
+            err(f"external tool {n!r}: install.sourceRef is required — pin to a tag or commit")
+        elif install.get("sourceRefType") == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
+            err(f"external tool {n!r}: install.sourceRef must be a full 40-char commit SHA")
+        if not install.get("steps"):
+            err(f"external tool {n!r}: install.steps is required")
+        if not install.get("verify"):
+            err(f"external tool {n!r}: install.verify is required")
+
+        # A referenced pointer skill must exist and agree on the pinned ref.
+        rel_skill = t.get("relatedSkill")
+        if rel_skill:
+            sp = os.path.join(ROOT, "skills", rel_skill, "SKILL.md")
+            if not os.path.isfile(sp):
+                err(f"external tool {n!r}: relatedSkill {rel_skill!r} does not exist")
+            elif ref:
+                body = open(sp, encoding="utf-8").read()
+                if ref not in body:
+                    err(
+                        f"external tool {n!r}: pinned sourceRef {ref[:12]}... is not present in "
+                        f"skills/{rel_skill}/SKILL.md — the registry and the skill have drifted"
+                    )
+                if repo and repo not in body:
+                    err(
+                        f"external tool {n!r}: skills/{rel_skill}/SKILL.md does not link the "
+                        f"upstream repository"
+                    )
+
+    print(f"external tools OK: {', '.join(sorted(seen))}")
+
+
 def main():
     skills_root = os.path.join(ROOT, "skills")
     if not os.path.isdir(skills_root):
@@ -260,6 +339,7 @@ def main():
         print(f"checked {len(found)} skill(s): {', '.join(found)}")
 
     check_manifests()
+    check_external_tools()
 
     for w in warnings:
         print(f"WARN  {w}")

@@ -66,6 +66,33 @@ These are enforced by CI and by review:
 Add `agents/<name>.agent.md` with at minimum a `description` in frontmatter, then add
 `"agents": "agents/"` to `plugin.json`.
 
+## Adding an external tool
+
+To make a third-party tool discoverable without bundling it, add an entry to
+[`tools/external-tools.json`](tools/external-tools.json). **Never vendor third-party
+source code into this repository.**
+
+That file is the source of truth. Required fields: `name`, `description`,
+`repository` (an `https://github.com/` URL), `license`, `author`, and `install`.
+CI additionally enforces:
+
+- `bundled: false` — this catalog vendors no third-party code.
+- `requiresConfirmation: true` — agents must get explicit user consent before
+  installing. These tools execute on the user's machine.
+- `install.sourceRef` pinned to a **full 40-character commit SHA** (or a tag).
+  Never a moving branch.
+- `install.steps` and `install.verify` present — and **actually tested**. Install
+  the tool from the pinned ref into a throwaway prefix and confirm the verify
+  command succeeds before you commit the entry. Record what you did in `verified`.
+- If you set `relatedSkill`, that skill must exist, must link the upstream
+  repository, and must contain the same pinned SHA. This stops the registry and
+  the skill from drifting apart.
+
+A pointer skill is optional but recommended — it is what teaches an agent *when*
+to reach for the tool. Write your own prose. Do not copy upstream documentation
+wholesale; link to the upstream README **at the pinned commit** for the
+authoritative reference, and summarize only what the agent needs.
+
 ## Manifests
 
 Two files must stay byte-identical: `.github/plugin/marketplace.json` and

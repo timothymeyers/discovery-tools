@@ -23,6 +23,29 @@ component layout. No symlinks, no duplication, no build step.
 |---|---|---|
 | [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines (Clio / Science Engine, copilot-cli / Mission Control), models, and interactive chat. Handles seven known data-quality traps. Cost reporting is a deliberate opt-in feature flag. |
 | [`build-research-paper`](skills/build-research-paper) | 2 | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures, using `tectonic` (default) or `pandoc` (escape hatch). Ships templates, a scaffolder, build and check scripts, and referee-revision scaffolding. |
+| [`osti-literature-search`](skills/osti-literature-search) | 1 | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
+
+### External tools
+
+Tools this catalog makes discoverable but does **not** bundle. No third-party
+source code is vendored in this repository — each entry is a pointer plus the
+metadata an agent needs to evaluate, install, and drive the tool.
+
+| Tool | Author | License | Pointer skill |
+|---|---|---|---|
+| [`osti-axi`](https://github.com/davenovelli-pnnl/osti-axi) — OSTI.GOV search and full-text retrieval CLI for agents | Dave Novelli (PNNL) | MIT | [`osti-literature-search`](skills/osti-literature-search) |
+
+The machine-readable registry is [`tools/external-tools.json`](tools/external-tools.json).
+It is the source of truth: it carries the pinned commit, runtime prerequisites,
+verified install steps, and safety metadata, and CI enforces that any pointer
+skill agrees with it.
+
+> [!WARNING]
+> External tools are **third-party code executed on the user's machine**, and
+> are not reviewed or warranted by this catalog. Every entry is marked
+> `requiresConfirmation: true` — agents must obtain explicit user consent
+> before installing one. Installing this catalog's plugin does **not** install
+> any external tool.
 
 ### Agents
 
@@ -138,6 +161,7 @@ prompt you before running anything. Report issues per [SECURITY.md](SECURITY.md)
 discovery-tools/
 ├── plugin.json                     # plugin manifest — plugin root IS the repo root
 ├── skills/<name>/SKILL.md          # the catalog; installable via `gh skill install`
+├── tools/external-tools.json       # registry of external tools (pointers, never vendored)
 ├── agents/<name>.agent.md          # custom agents (none yet)
 ├── starter-kits/<name>/            # project scaffolds (none yet)
 ├── .github/plugin/marketplace.json # Copilot CLI marketplace manifest

@@ -21,6 +21,10 @@ Skills distribution convention (`gh skill install`) and the plugin component loc
 4. **Keep the two marketplace manifests byte-identical.** After editing
    `.github/plugin/marketplace.json`, copy it to `.claude-plugin/marketplace.json`.
 5. **This repo is public.** Nothing internal, personal, or customer-identifying.
+6. **Never vendor third-party source code.** External tools are referenced through
+   `tools/external-tools.json` as pointers only, pinned to an immutable commit SHA
+   and gated behind `requiresConfirmation: true`. If you update a pinned SHA, update
+   it in both the registry and the pointer skill — CI fails if they drift.
 
 ## Before opening a PR
 

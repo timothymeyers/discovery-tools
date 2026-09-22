@@ -1,0 +1,76 @@
+{
+  "$comment": "Canonical registry of EXTERNAL tools this catalog points at but does NOT bundle. No third-party source code is vendored in this repository — each entry is a pointer plus the metadata an agent needs to evaluate, install, and invoke the tool. This file is the source of truth: README and any pointer skill must agree with it, and CI enforces that the pinned sourceRef matches.",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "osti-axi",
+      "description": "OSTI.GOV search and full-text retrieval CLI for agents. Searches DOE-funded research records, returns compact TOON output, and saves OSTI-provided PDF/text artifacts into the agent's workspace. Read-only: it never publishes, edits, or submits to OSTI, and never extracts text from PDFs.",
+      "repository": "https://github.com/davenovelli-pnnl/osti-axi",
+      "author": {
+        "name": "Dave Novelli",
+        "organization": "Pacific Northwest National Laboratory",
+        "url": "https://github.com/davenovelli-pnnl"
+      },
+      "license": "MIT",
+      "bundled": false,
+      "trustLevel": "third-party-unreviewed",
+      "requiresConfirmation": true,
+      "kind": "cli",
+      "bin": ["osti-axi"],
+      "interface": {
+        "type": "axi",
+        "spec": "https://github.com/kunchenguid/axi",
+        "output": "toon",
+        "exitCodes": { "0": "success", "1": "error", "2": "usage error" }
+      },
+      "runtimePrerequisites": {
+        "node": ">=20",
+        "git": "*",
+        "npm": "*"
+      },
+      "install": {
+        "type": "git-clone-build",
+        "sourceRef": "167b641cffeedfc8b3df9154f999fa951f950649",
+        "sourceRefType": "commit",
+        "steps": [
+          "git clone https://github.com/davenovelli-pnnl/osti-axi.git",
+          "cd osti-axi",
+          "git checkout 167b641cffeedfc8b3df9154f999fa951f950649",
+          "npm install",
+          "npm run build",
+          "npm install -g ."
+        ],
+        "verify": "osti-axi --version",
+        "verifyExpect": "0.1.0",
+        "notes": [
+          "Upstream has no git tags, no GitHub releases, and is not published to npm, so a commit SHA is the only immutable locator. The pin above was installed and smoke-tested end-to-end on 2026-09-22.",
+          "Do NOT install via 'npm install -g git+https://...#<sha>'. The package declares a 'prepack' script but no 'prepare' script, so npm does not build dist/ for git-spec installs and the declared bin target ./dist/bin/osti-axi.js never exists.",
+          "The upstream README's install snippet (clone then 'npm install -g .') is also insufficient from a clean clone: without a prior 'npm install' and 'npm run build' the TypeScript is never compiled and no binary is produced. The steps above are the verified-working sequence.",
+          "'npm install -g' places a binary on the user's PATH. Treat this as third-party code execution and obtain explicit user consent first."
+        ]
+      },
+      "commands": [
+        { "name": "search", "usage": "osti-axi search [query...] [filters]", "summary": "Search OSTI records by keyword and/or fielded filters." },
+        { "name": "digest", "usage": "osti-axi digest <osti_id> [--full]", "summary": "Fetch one record with abstract and resource links." },
+        { "name": "download", "usage": "osti-axi download <osti_id...> [--format pdf|text|both] [--out <dir>]", "summary": "Save OSTI-provided PDF/text artifacts. Writes to ./osti-downloads/ by default." }
+      ],
+      "documentation": "https://github.com/davenovelli-pnnl/osti-axi/blob/167b641cffeedfc8b3df9154f999fa951f950649/README.md",
+      "relatedSkill": "osti-literature-search",
+      "keywords": [
+        "osti",
+        "doe",
+        "scientific-literature",
+        "literature-search",
+        "full-text-retrieval",
+        "research-papers",
+        "axi",
+        "ai-for-science"
+      ],
+      "verified": {
+        "date": "2026-09-22",
+        "commit": "167b641cffeedfc8b3df9154f999fa951f950649",
+        "method": "Installed from the pinned commit into a throwaway npm prefix, confirmed 'osti-axi --version' reported 0.1.0, and ran a live read-only search against OSTI.GOV."
+      }
+    }
+  ]
+}

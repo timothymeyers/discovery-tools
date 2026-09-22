@@ -30,6 +30,29 @@ every catalog — including this one — as untrusted code until you have read i
 - Generated artifacts default to the current working directory and are gitignored, because
   they can contain absolute local paths and full agent prompts.
 
+## External tools
+
+This catalog **points at** some third-party tools without bundling them. No third-party
+source code is vendored here. Pointers live in
+[`tools/external-tools.json`](tools/external-tools.json), and each one:
+
+- is marked `bundled: false` and `requiresConfirmation: true`, so an agent must obtain
+  **explicit user consent** before installing it;
+- is pinned to an **immutable commit SHA or tag**, never a moving branch;
+- records who verified it, when, and how.
+
+CI enforces all of the above, including that a pointer skill and the registry cannot
+silently drift to different pinned commits.
+
+**What this does not mean.** These tools are not reviewed, audited, or warranted by this
+catalog. Installing them runs third-party code on your machine, usually placing a binary
+on your `PATH`. Read the upstream repository before consenting. Installing this catalog's
+plugin does **not** install any external tool.
+
+Report a vulnerability in an external tool to **its** maintainers. Report a bad or stale
+pointer — a wrong pinned commit, a tool that has turned malicious, a broken install — to
+this repository.
+
 ## Known data-sensitivity note
 
 `discovery-token-usage` reads `.discovery/` workspace exhaust, which includes **full agent
