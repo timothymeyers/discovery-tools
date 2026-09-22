@@ -1,0 +1,36 @@
+name: validate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate catalog
+        run: python3 .github/scripts/validate.py
+
+      - name: Byte-compile skill scripts
+        run: |
+          find skills -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
+          echo "all skill scripts compile"
+
+      - name: Assert no generated artifacts are tracked
+        run: |
+          if git ls-files | grep -E 'token_usage_mined\.json|token-usage-report.*\.md'; then
+            echo "::error::generated artifact is tracked in git"
+            exit 1
+          fi
+          echo "no generated artifacts tracked"

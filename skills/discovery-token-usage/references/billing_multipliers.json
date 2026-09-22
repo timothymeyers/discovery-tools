@@ -1,0 +1,23 @@
+{
+  "_note": "GitHub Copilot premium-unit multipliers, recovered from the ACP model catalog in .discovery/engine/copilot-cli/logs/*/copilot-stdout.log. cost_per_request = multiplier. Update by re-reading a recent copilot-stdout.log if new models appear.",
+  "multipliers": {
+    "gpt-5-mini": 0,
+    "claude-haiku-4.5": 0.33,
+    "gpt-5.4-mini": 0.33,
+    "claude-sonnet-5": 1,
+    "gpt-5.4": 1,
+    "gpt-5.6-sol": 1,
+    "gemini-3.1-pro": 1,
+    "grok-4.5": 1,
+    "claude-opus-4.6": 3,
+    "claude-opus-4.7": 7.5,
+    "gpt-5.5": 7.5,
+    "gemini-3.5-flash": 14,
+    "gemini-3.6-flash": 14,
+    "claude-opus-5": 15,
+    "claude-opus-4.8": 15
+  },
+  "_missing_from_catalog": [
+    "gpt-4o-mini-2024-07-18"
+  ]
+}

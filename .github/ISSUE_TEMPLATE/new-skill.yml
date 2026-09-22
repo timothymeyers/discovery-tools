@@ -1,0 +1,39 @@
+name: New skill proposal
+description: Propose a new skill for the discovery-tools catalog
+title: "[skill] "
+labels: ["skill", "enhancement"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Skill name
+      description: Lowercase, hyphenated. This becomes the directory name and the frontmatter `name`.
+      placeholder: discovery-workspace-audit
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What it does and WHEN it should trigger. Max 1024 chars — this is what `gh skill search` indexes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What Discovery problem does this solve?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Payload rules
+      description: Required for any skill with a `scripts/` directory.
+      options:
+        - label: Resolves its own payload at runtime — no hardcoded `~/.copilot/skills/...` path
+        - label: Writes generated output to the CWD, never into its own install directory
+        - label: Emits no secrets, personal paths, or customer-identifying data
+        - label: Does not pre-approve tools via `allowed-tools`

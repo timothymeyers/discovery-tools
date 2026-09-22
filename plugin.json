@@ -1,0 +1,24 @@
+{
+  "name": "discovery-tools",
+  "version": "0.1.0",
+  "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Mine workspace exhaust, inspect engine token usage, and scaffold new Discovery projects.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "microsoft-discovery",
+    "ai-for-science",
+    "scientific-computing",
+    "token-usage",
+    "observability",
+    "agent-skills",
+    "copilot-cli"
+  ],
+  "skills": [
+    "skills/"
+  ]
+}
