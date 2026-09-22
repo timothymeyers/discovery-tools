@@ -19,9 +19,10 @@ component layout. No symlinks, no duplication, no build step.
 
 ### Skills
 
-| Skill | What it does |
-|---|---|
-| [`discovery-token-usage`](skills/discovery-token-usage) | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines (Clio / Science Engine, copilot-cli / Mission Control), models, and interactive chat. Handles seven known data-quality traps. Cost reporting is a deliberate opt-in feature flag. |
+| Skill | Version | What it does |
+|---|---|---|
+| [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines (Clio / Science Engine, copilot-cli / Mission Control), models, and interactive chat. Handles seven known data-quality traps. Cost reporting is a deliberate opt-in feature flag. |
+| [`build-research-paper`](skills/build-research-paper) | 2 | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures, using `tectonic` (default) or `pandoc` (escape hatch). Ships templates, a scaffolder, build and check scripts, and referee-revision scaffolding. |
 
 ### Agents
 
@@ -147,6 +148,39 @@ discovery-tools/
 Why `.claude-plugin/marketplace.json` is a real file rather than a symlink (which is what
 `github/copilot-plugins` uses): git symlinks degrade to plain text files on Windows clones
 and in downloaded ZIPs. CI asserts the two files stay byte-identical.
+
+## Versioning
+
+Two different things carry versions here, and they are not the same:
+
+- **The catalog** (`plugin.json` + both `marketplace.json` files) is versioned with
+  semver, in lockstep with the git tag. This is what `copilot plugin install` sees.
+- **Each skill** carries `metadata.version` in its `SKILL.md` frontmatter — a simple
+  integer that increments when the skill's behavior changes materially.
+
+> [!IMPORTANT]
+> Skill versions go under `metadata:`, **never** as a top-level `version:` key.
+> The Agent Skills spec defines an allow-list of exactly six top-level fields
+> (`name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`).
+> The spec's reference validator and Anthropic's packaging script both treat any
+> other top-level key as a **hard error rather than ignoring it**, so a stray
+> `version:` breaks `.skill` packaging and claude.ai upload. `metadata` is the
+> spec's designated extension point: a string → string map that clients ignore.
+
+```yaml
+---
+name: my-skill
+description: |
+  ...
+metadata:
+  version: "1"
+---
+```
+
+Note the quotes — `metadata` values must be **strings**, not numbers.
+
+For consumers, the version of record is still the **git tag**: `gh skill install`
+resolves `skill@v1.2.0` from releases, not from frontmatter.
 
 ## Contributing
 

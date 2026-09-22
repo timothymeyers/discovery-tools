@@ -13,6 +13,8 @@ description: |
   "engine spend", "Clio vs copilot-cli", "mine .discovery/", "engine token
   read-out", "which model used the most tokens", "prompt inventory",
   "session_shutdown metrics", "TokenJournal".
+metadata:
+  version: "1"
 ---
 
 # discovery-token-usage — Discovery App Token Miner

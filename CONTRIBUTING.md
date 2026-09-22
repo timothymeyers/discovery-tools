@@ -26,7 +26,20 @@
    | `metadata` | no | string → string map |
    | `allowed-tools` | no | **space-separated string**, not a YAML array |
 
-   There is no `version` field. Versioning is by git tag.
+   **This list is an allow-list, not a suggestion.** The spec's reference validator
+   (`skills-ref`) and Anthropic's `package_skill.py` both reject any other top-level
+   key with a hard error rather than ignoring it. CI enforces the same rule.
+
+   In particular, **do not add a top-level `version:`**. Put it under `metadata`:
+
+   ```yaml
+   metadata:
+     version: "2"
+   ```
+
+   Values must be quoted strings — `metadata` is a string → string map. Bump this
+   integer when a skill's behavior changes materially. The version consumers
+   actually resolve is the git tag (`gh skill install skill@v1.2.0`).
 
 3. Optional convention subdirectories: `scripts/`, `references/`, `assets/`.
    Note the **plural** `references/`.

@@ -16,6 +16,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
+# Agent Skills spec allow-list. The spec's reference validator (skills-ref) and
+# Anthropic's package_skill.py both treat any other top-level key as a HARD ERROR
+# rather than ignoring it, so a stray `version:` breaks publishing and upload.
+# Versions belong under `metadata:` (a string->string map for non-spec fields).
+ALLOWED_FRONTMATTER = {
+    "name",
+    "description",
+    "license",
+    "compatibility",
+    "metadata",
+    "allowed-tools",
+}
+
 # Paths that must never be baked into a published skill.
 HARDCODED_PATH_RE = re.compile(
     r"~/\.copilot/skills/[a-z]|~/\.agents/skills/[a-z]|/Users/[a-z]|/home/[a-z]"
@@ -43,29 +56,51 @@ def warn(msg):
 
 
 def parse_frontmatter(text, path):
-    """Minimal YAML frontmatter reader: top-level scalars and block scalars only."""
+    """Minimal YAML frontmatter reader.
+
+    Returns (fields, metadata) where `fields` maps top-level keys to their
+    de-indented scalar/block text, and `metadata` maps the nested keys under
+    `metadata:` to their values. Deliberately avoids a PyYAML dependency so the
+    validator runs anywhere with bare Python 3.
+    """
     if not text.startswith("---"):
         err(f"{path}: missing YAML frontmatter")
-        return None
+        return None, None
     end = text.find("\n---", 3)
     if end == -1:
         err(f"{path}: unterminated frontmatter")
-        return None
+        return None, None
 
-    data, key, buf = {}, None, []
+    fields, raw, key, buf = {}, {}, None, []
     for line in text[3:end].splitlines():
-        m = re.match(r"^([A-Za-z0-9_-]+):\s*(.*)$", line)
+        m = re.match(r"^([A-Za-z0-9_-]+):[ \t]*(.*)$", line)
         if m and not line.startswith((" ", "\t")):
             if key:
-                data[key] = "\n".join(buf).strip()
+                fields[key] = "\n".join(x.strip() for x in buf).strip()
+                raw[key] = buf
             key = m.group(1)
             val = m.group(2).strip()
             buf = [] if val in ("|", ">", "|-", ">-", "") else [val]
         elif key:
-            buf.append(line.strip())
+            buf.append(line)
     if key:
-        data[key] = "\n".join(buf).strip()
-    return data
+        fields[key] = "\n".join(x.strip() for x in buf).strip()
+        raw[key] = buf
+
+    # `metadata:` must be a nested map; parse its indented child keys.
+    metadata = None
+    if "metadata" in fields:
+        metadata = {}
+        for line in raw.get("metadata", []):
+            if not line.strip():
+                continue
+            if not line.startswith((" ", "\t")):
+                metadata = None  # not an indented block -> not a map
+                break
+            mm = re.match(r"^\s+([A-Za-z0-9_.-]+):[ \t]*(.*)$", line)
+            if mm:
+                metadata[mm.group(1)] = mm.group(2).strip().strip('"\'')
+    return fields, metadata
 
 
 def check_skill(skill_dir):
@@ -77,7 +112,9 @@ def check_skill(skill_dir):
         err(f"{rel}: no SKILL.md")
         return
 
-    fm = parse_frontmatter(open(skill_md, encoding="utf-8").read(), f"{rel}/SKILL.md")
+    fm, metadata = parse_frontmatter(
+        open(skill_md, encoding="utf-8").read(), f"{rel}/SKILL.md"
+    )
     if fm is None:
         return
 
@@ -99,8 +136,24 @@ def check_skill(skill_dir):
     if "allowed-tools" in fm and fm["allowed-tools"].lstrip().startswith(("[", "-")):
         err(f"{rel}: 'allowed-tools' must be a space-separated string, not an array")
 
-    if "version" in fm:
-        warn(f"{rel}: 'version' is not in the Agent Skills spec; version via git tags")
+    extra = set(fm) - ALLOWED_FRONTMATTER
+    if extra:
+        err(
+            f"{rel}: unexpected top-level frontmatter field(s) "
+            f"{', '.join(sorted(extra))}. The Agent Skills spec allows only "
+            f"{', '.join(sorted(ALLOWED_FRONTMATTER))} — anything else is a hard "
+            f"error for skills-ref validate and Anthropic packaging. "
+            f"Put a version under 'metadata:' instead."
+        )
+
+    if fm.get("metadata") is not None and metadata is None:
+        err(f"{rel}: 'metadata' must be a map of string keys to string values")
+    elif metadata is not None:
+        for k, v in metadata.items():
+            if not v:
+                err(f"{rel}: metadata.{k} has no value; must be a string")
+        if "version" in metadata and not re.fullmatch(r"[\w.+-]+", metadata["version"]):
+            err(f"{rel}: metadata.version {metadata['version']!r} is not a plain string")
 
     if os.path.isdir(os.path.join(skill_dir, "reference")):
         err(f"{rel}: use 'references/' (plural), not 'reference/'")
