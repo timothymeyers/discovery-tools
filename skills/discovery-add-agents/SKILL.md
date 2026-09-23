@@ -1,21 +1,24 @@
 ---
 name: discovery-add-agents
 description: |
-  Add agents from the public microsoft/discovery GitHub repository to a workspace, then
-  deploy each selected agent to exactly one target: (a) the local Copilot app, emitting a
-  `.github/agents/<name>.agent.md` companion invocable via `runSubagent`; (b) a Microsoft
-  Discovery project plus Azure via `UpsertAgent`, binding existing tool ARM resources or
-  building and registering missing ones; or (c) promoting an already-local agent up to a
-  Discovery project without re-fetching upstream. USE FOR: 'add the discovery agents',
-  'download discovery agents', 'install all Microsoft discovery agents', 'add agents from
-  microsoft/discovery', 'create copilot agents from microsoft/discovery', 'deploy
-  discovery agents to Foundry', 'deploy discovery agents to Azure', 'promote a local agent
-  to Microsoft Discovery'. DO NOT USE FOR: running a deployed agent (use runSubagent), or
-  editing one agent's prompt (edit `agent.yaml`).
-license: MIT
+  Cross-domain / Research platform engineering — Add agents from the public
+  microsoft/discovery GitHub repository to a workspace, then deploy each
+  selected agent to exactly one target: (a) the local Copilot app, emitting a
+  `.github/agents/<name>.agent.md` companion invocable via `runSubagent`; (b)
+  a Microsoft Discovery project plus Azure via `UpsertAgent`, binding existing
+  tool ARM resources or building and registering missing ones; or (c)
+  promoting an already-local agent up to a Discovery project without
+  re-fetching upstream. USE FOR: 'add the discovery agents', 'download
+  discovery agents', 'install all Microsoft discovery agents', 'add agents
+  from microsoft/discovery', 'create copilot agents from microsoft/discovery',
+  'deploy discovery agents to Foundry', 'deploy discovery agents to Azure',
+  'promote a local agent to Microsoft Discovery'. DO NOT USE FOR: running a
+  deployed agent (use runSubagent), or editing one agent's prompt (edit
+  `agent.yaml`).
 metadata:
-  author: "Tim Meyers"
   version: "1.16.0"
+  category: "Cross-domain"
+  subfield: "Research platform engineering"
 ---
 
 # add-agent-from-catalog

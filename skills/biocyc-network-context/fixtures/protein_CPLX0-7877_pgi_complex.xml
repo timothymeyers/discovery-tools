@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/04_enzyme_pgi_a.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:CPLX0-7877'>
+<Protein ID='ECOLI:CPLX0-7877' orgid='ECOLI' frameid='CPLX0-7877' detail='full'>
+<common-name datatype='string'>glucose-6-phosphate isomerase</common-name>
+<component><Protein resource='getxml?ECOLI:PGLUCISOM' orgid='ECOLI' frameid='PGLUCISOM'/><coefficient datatype='integer'>2</coefficient>
+</component>
+</Protein>
+</ptools-xml>

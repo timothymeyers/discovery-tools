@@ -1,0 +1,112 @@
+{
+  "_synthetic_do_not_use_as_evidence": true,
+  "_description": "Fabricated BRENDA-shaped subset (schema-conformant, illustrative only -- no real measurement, organism-linkage, or literature claim). Used solely to exercise this skill's parser/builder/schema-validation logic offline. Never present any value below as real scientific evidence.",
+  "release": "2026.1",
+  "version": "1",
+  "schema_version_note": "release='2026.1' is BRENDA's bulk-download RELEASE label; version='1' is the payload-FORMAT-generation counter, a disjoint number from the externally-hosted schema DOCUMENT semver (2.0.0, see fixtures/brenda_schema/*.schema.json '$id'). Never conflate these three numbers.",
+  "extraction_scope_note": "Synthetic fixture standing in for a real extract_subset.py output.",
+  "target_ecs_not_found_in_dump": [],
+  "data": {
+    "1.1.1.49": {
+      "id": "1.1.1.49",
+      "recommended_name": "glucose-6-phosphate dehydrogenase (synthetic fixture enzyme)",
+      "systematic_name": "D-glucose-6-phosphate:NADP+ 1-oxidoreductase",
+      "protein": {
+        "9001": {
+          "organism": "Escherichia coli",
+          "accessions": ["P0FAKE1"],
+          "references": ["9001"]
+        }
+      },
+      "km_value": [
+        {
+          "value": "0.1 {D-glucose 6-phosphate}",
+          "proteins": ["9001"],
+          "references": ["9001"],
+          "comment": "synthetic positive Km, fabricated for test coverage"
+        },
+        {
+          "value": "0.05-0.09 {fabricated-substrate-X}",
+          "proteins": ["9001"],
+          "references": ["9001"],
+          "comment": "synthetic range value fixture"
+        }
+      ],
+      "turnover_number": [
+        {
+          "value": "-999 {more}",
+          "proteins": ["9001"],
+          "references": ["9001"],
+          "comment": "catalytic rate constant 174 s-1 (synthetic); sentinel means the real number lives in this comment, not the value field"
+        }
+      ],
+      "specific_activity": [
+        {
+          "value": "-999",
+          "proteins": ["9001"],
+          "references": ["9001"],
+          "comment": "wild-type strain K-10 (synthetic strain hint, incidental free text -- not a canonical strain assignment)"
+        }
+      ],
+      "reference": {
+        "9001": {
+          "id": "9001",
+          "pmid": "10194349",
+          "title": "A fabricated title for parser/build testing only",
+          "authors": ["Fixture, S."],
+          "journal": "Journal of Synthetic Fixtures",
+          "year": 2026
+        }
+      }
+    },
+    "5.3.1.9": {
+      "id": "5.3.1.9",
+      "recommended_name": "glucose-6-phosphate isomerase (synthetic fixture enzyme)",
+      "_publisher_regex_defect_note": "This EC's own id '5.3.1.9' fails BRENDA's published enzyme.schema.json id pattern '^(?:[1-7]\\.[1-9][0-9]{0,2}\\.[1-9][0-9]{0,2}\\.B?[1-7][0-9]{0,2})|spontaneous$' because the 4th (serial) digit group '9' does not match 'B?[1-7][0-9]{0,2}' (it starts with 9, not 1-7). A naive corpus-level validation pass relying only on brenda.schema.json's patternProperties would silently SKIP this EC entirely rather than flag it -- this fixture exists to regression-test that this skill's validate_schema.py surfaces that defect honestly instead of hiding it behind a false '0 errors'.",
+      "protein": {
+        "9002": {
+          "organism": "Escherichia coli",
+          "accessions": [],
+          "references": ["9002"]
+        }
+      },
+      "km_value": [
+        {
+          "value": "0.147 {D-fructose 6-phosphate}",
+          "proteins": ["9002"],
+          "references": ["9002"],
+          "comment": "synthetic positive Km, fabricated for test coverage"
+        }
+      ],
+      "reference": {
+        "9002": {
+          "id": "9002",
+          "title": "A second fabricated title, no pmid on purpose",
+          "authors": ["Fixture, T."],
+          "journal": "Journal of Synthetic Fixtures",
+          "year": 2026
+        }
+      }
+    },
+    "4.1.1.39": {
+      "id": "4.1.1.39",
+      "recommended_name": "RuBisCO (synthetic fixture enzyme, disjoint organism from the EC above)",
+      "protein": {
+        "9003": {
+          "organism": "Prochlorococcus marinus",
+          "accessions": [],
+          "references": []
+        }
+      },
+      "localization": [
+        {
+          "value": "carboxysome",
+          "proteins": ["9003"],
+          "references": [],
+          "comment": "synthetic localization fixture; illustrates species-only organism field with strain explicitly unresolved"
+        }
+      ],
+      "reference": {}
+    }
+  }
+}

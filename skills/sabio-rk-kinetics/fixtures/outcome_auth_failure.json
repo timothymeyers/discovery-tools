@@ -1,0 +1,6 @@
+{
+  "_fixture_note": "Synthetic HTTP 403 response fixture. Must classify as outcome=failure, failure_kind=authorization -- distinct from a transport failure or a confirmed-empty result.",
+  "http_status": 403,
+  "headers": {"Content-Type": "text/html"},
+  "body": "<html><body>Forbidden</body></html>"
+}

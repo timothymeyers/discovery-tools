@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/05_enzyme_pgi_b.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:CPLX-8401'>
+<Protein ID='ECOLI:CPLX-8401' orgid='ECOLI' frameid='CPLX-8401' detail='full'>
+<common-name datatype='string'>5-dehydro-4-deoxy-D-glucuronate isomerase</common-name>
+<component><Protein resource='getxml?ECOLI:G7463-MONOMER' orgid='ECOLI' frameid='G7463-MONOMER'/><coefficient datatype='integer'>2</coefficient>
+</component>
+</Protein>
+</ptools-xml>

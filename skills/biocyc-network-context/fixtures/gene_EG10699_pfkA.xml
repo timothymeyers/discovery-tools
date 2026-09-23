@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/15_gene_pfkA.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:EG10699'><metadata><PGDB orgid='ECOLI' version='30.0'><dblink><dblink-db>NCBI-TAXONOMY-DB</dblink-db><dblink-oid>511145</dblink-oid></dblink></PGDB></metadata>
+<Gene ID='ECOLI:EG10699' orgid='ECOLI' frameid='EG10699' detail='full'>
+<common-name datatype='string'>pfkA</common-name>
+<accession-1 datatype='string'>b3916</accession-1>
+<left-end-position datatype='integer'>4107552</left-end-position>
+<right-end-position datatype='integer'>4108514</right-end-position>
+<transcription-direction datatype='string'>+</transcription-direction>
+</Gene>
+</ptools-xml>

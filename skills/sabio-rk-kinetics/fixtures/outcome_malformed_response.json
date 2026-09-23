@@ -1,0 +1,4 @@
+{
+  "_fixture_note": "Synthetic malformed top-level response: HTTP 200 but missing both 'meta' and 'data' keys. Must classify as outcome=failure, failure_kind=parser (malformed_top_level_response), never crash the run.",
+  "unexpected_shape": true
+}

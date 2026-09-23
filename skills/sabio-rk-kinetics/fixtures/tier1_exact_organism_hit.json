@@ -1,0 +1,18 @@
+{
+  "_fixture_note": "Synthetic, redistributable page-1 response for a tier-1 (exact organism) query -- one matching kinetic-law entry, single page.",
+  "meta": {"page": 1, "page_size": 100, "total_count": 1, "total_pages": 1},
+  "data": [
+    {
+      "id": 1,
+      "general": {
+        "organism": {"id": 1, "name": "Escherichia coli", "ncbi_taxonomy_id": 562, "ncbi_taxonomy_lineage": ["Bacteria", "Pseudomonadota", "Gammaproteobacteria", "Enterobacterales", "Enterobacteriaceae", "Escherichia"]},
+        "strain": {"id": null, "name": "K-12"},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [
+        {"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 0.5, "unit": {"name": "mM"}}
+      ]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "_fixture_note": "Synthetic pagination fixture, page 2 of 2 -- the last page. Used together with pagination_page1_of2.json to test exhaustive-mode following and truncated=false when both pages are retrieved.",
+  "meta": {"page": 2, "page_size": 100, "total_count": 150, "total_pages": 2},
+  "data": [
+    {"id": 2, "general": {"organism": {"id": 2, "name": "Escherichia coli", "ncbi_taxonomy_id": 562, "ncbi_taxonomy_lineage": ["Bacteria"]}}, "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": []}, "enzyme_description": {"ec_number": "1.1.1.1"}}
+  ]
+}

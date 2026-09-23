@@ -43,8 +43,40 @@ SECRET_RE = re.compile(
 
 TEXT_EXT = (".md", ".py", ".sh", ".json", ".txt", ".yml", ".yaml")
 
+# Directories that are build/test output and must never be committed.
+FORBIDDEN_DIRS = (".pytest_cache", "__pycache__", ".ruff_cache", ".mypy_cache")
+
+# Controlled vocabulary for metadata.category. Deliberately broader than the
+# catalog currently needs: a vocabulary that only covers today's skills forces
+# validator and docs churn the first time someone adds a new domain. Extend this
+# list (and the README/CONTRIBUTING tables) rather than inventing values ad hoc.
+CATEGORIES = {
+    "Life sciences",
+    "Physical sciences",
+    "Earth and environmental sciences",
+    "Engineering and materials",
+    "Computer and information sciences",
+    "Mathematics and statistics",
+    "Cross-domain",
+}
+
+# The visible half of the two-layer taxonomy. Only `name` and `description` are
+# loaded at agent startup, so a taxonomy that lives only in `metadata:` is inert
+# for routing. Every description must therefore lead with "Category / Subfield — ".
+# Matched against whitespace-normalised text, because the cue routinely spans a
+# line wrap and category names contain hyphens ("Cross-domain").
+CUE_RE = re.compile(r"^[A-Z][A-Za-z&\- ]+ / .+? — \S")
+
+
+def normalize(text):
+    """Collapse all whitespace, so line wrapping never changes a match."""
+    return " ".join((text or "").split())
+
 errors = []
 warnings = []
+
+# skill name -> metadata.category, populated by check_skill()
+SKILL_CATEGORIES = {}
 
 
 def err(msg):
@@ -154,6 +186,13 @@ def check_skill(skill_dir):
         err(f"{rel}: frontmatter missing required field 'description'")
     elif len(desc) > 1024:
         err(f"{rel}: description is {len(desc)} chars (limit 1024)")
+    elif not CUE_RE.match(normalize(desc)):
+        err(
+            f"{rel}: description must lead with a domain cue in the form "
+            f"'Category / Subfield — ...'. Only name and description load at agent "
+            f"startup, so a taxonomy kept solely in 'metadata:' cannot influence "
+            f"routing. Got: {desc[:60]!r}"
+        )
 
     if "allowed-tools" in fm and fm["allowed-tools"].lstrip().startswith(("[", "-")):
         err(f"{rel}: 'allowed-tools' must be a space-separated string, not an array")
@@ -177,11 +216,50 @@ def check_skill(skill_dir):
         if "version" in metadata and not re.fullmatch(r"[\w.+-]+", metadata["version"]):
             err(f"{rel}: metadata.version {metadata['version']!r} is not a plain string")
 
+    # --- domain taxonomy (portable half) ---
+    meta = metadata or {}
+    category, subfield = meta.get("category"), meta.get("subfield")
+    if not category:
+        err(
+            f"{rel}: metadata.category is required so installers and agents can tell "
+            f"which scientific domain this skill serves. One of: "
+            f"{', '.join(sorted(CATEGORIES))}"
+        )
+    elif category not in CATEGORIES:
+        err(
+            f"{rel}: metadata.category {category!r} is not in the controlled "
+            f"vocabulary. Use one of {', '.join(sorted(CATEGORIES))}, or extend "
+            f"CATEGORIES here and in README.md/CONTRIBUTING.md together."
+        )
+    if not subfield:
+        err(f"{rel}: metadata.subfield is required (free text, e.g. 'Enzymology')")
+    SKILL_CATEGORIES[name] = category
+
+    # The two halves must agree, or the visible cue misleads about the portable
+    # taxonomy and the README table built from metadata will not match it.
+    if category and subfield and desc and CUE_RE.match(normalize(desc)):
+        cue = normalize(desc).split(" — ", 1)[0].strip()
+        cue_category = cue.split(" / ", 1)[0].strip()
+        if cue_category != category:
+            err(
+                f"{rel}: description cue category {cue_category!r} does not match "
+                f"metadata.category {category!r}"
+            )
+
     if os.path.isdir(os.path.join(skill_dir, "reference")):
         err(f"{rel}: use 'references/' (plural), not 'reference/'")
 
     # --- repo safety rules ---
-    for dirpath, _, filenames in os.walk(skill_dir):
+    for dirpath, dirnames, filenames in os.walk(skill_dir):
+        # Build/test caches are generated artifacts; never publish them.
+        for bad_dir in list(dirnames):
+            if bad_dir in FORBIDDEN_DIRS:
+                err(
+                    f"{os.path.relpath(os.path.join(dirpath, bad_dir), ROOT)}: "
+                    f"generated cache directory must not be committed"
+                )
+                dirnames.remove(bad_dir)
+
         for fn in filenames:
             fp = os.path.join(dirpath, fn)
             frel = os.path.relpath(fp, ROOT)
@@ -232,10 +310,14 @@ def check_manifests():
         err(f"manifest is not valid JSON — {e}")
         return
 
-    if a != b:
+    # The docs promise these two are byte-identical (a real-file copy, never a
+    # symlink, because symlinks degrade on Windows clones and ZIP exports).
+    # Comparing parsed JSON would let formatting drift through silently.
+    if open(gh_mkt, "rb").read() != open(cc_mkt, "rb").read():
         err(
-            ".github/plugin/marketplace.json and .claude-plugin/marketplace.json differ; "
-            "run: cp .github/plugin/marketplace.json .claude-plugin/marketplace.json"
+            ".github/plugin/marketplace.json and .claude-plugin/marketplace.json are "
+            "not byte-identical; run: "
+            "cp .github/plugin/marketplace.json .claude-plugin/marketplace.json"
         )
 
     for field in ("name", "plugins"):
@@ -248,7 +330,9 @@ def check_manifests():
     versions |= {p.get("version") for p in a.get("plugins", [])}
     versions.discard(None)
     if len(versions) > 1:
-        warn(f"version fields are out of sync across manifests: {sorted(versions)}")
+        # A released catalog that reports three different versions is a real
+        # publishing defect, not a style nit.
+        err(f"version fields are out of sync across manifests: {sorted(versions)}")
 
     for s in pj.get("skills", []):
         if not os.path.isdir(os.path.join(ROOT, s.rstrip("/"))):
@@ -344,6 +428,33 @@ def check_external_tools():
     print(f"external tools OK: {', '.join(sorted(seen))}")
 
 
+def check_readme(skill_names):
+    """The README skills table must list every skill, with its category.
+
+    The taxonomy's source of truth is each SKILL.md. The README is a view of it,
+    so it is validated rather than hand-maintained in parallel — a second
+    hand-authored source of truth would drift on the first busy day.
+    """
+    path = os.path.join(ROOT, "README.md")
+    if not os.path.isfile(path):
+        err("README.md: missing")
+        return
+    body = open(path, encoding="utf-8").read()
+
+    missing = [n for n in skill_names if f"skills/{n})" not in body]
+    if missing:
+        err(
+            f"README.md does not list skill(s): {', '.join(missing)}. "
+            f"Every skill must appear in the skills table."
+        )
+
+    for category in sorted({c for c in SKILL_CATEGORIES.values() if c}):
+        if category not in body:
+            err(f"README.md: no section or row for category {category!r}")
+
+    print(f"README lists all {len(skill_names)} skill(s)")
+
+
 def main():
     skills_root = os.path.join(ROOT, "skills")
     if not os.path.isdir(skills_root):
@@ -359,6 +470,7 @@ def main():
         for d in found:
             check_skill(os.path.join(skills_root, d))
         print(f"checked {len(found)} skill(s): {', '.join(found)}")
+        check_readme(found)
 
     check_manifests()
     check_external_tools()

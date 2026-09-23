@@ -1,0 +1,18 @@
+<!-- SYNTHETIC fixture. Not captured from any live vendor response. Authored
+     fresh to exercise the "gated" classification branch (an HTTP 404 object
+     page blocked by a bot/subscription challenge, per the DX-30 precedent
+     for a MED4 object page -- see ../references/missing-frame-vs-gated.md).
+     EcoCyc itself never returned a gated response during DX-53's live
+     traversal (it is a BioCyc "Open Database"); this fixture stands in for
+     the class of response CyanoCyc/other Tier-2/3 organism-specific PGDBs
+     can return. Contains no organism-specific, MED4, or vendor content. -->
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="Content-Security-Policy" content="script-src 'self' https://js.hcaptcha.com https://newassets.hcaptcha.com">
+<title>404 Not Found</title>
+</head>
+<body>
+<h1>Access Restricted</h1>
+<p>This object page requires a subscription or human verification to view.</p>
+<div class="h-captcha" data-sitekey="00000000-0000-0000-0000-000000000000"></div>
+</body></html>

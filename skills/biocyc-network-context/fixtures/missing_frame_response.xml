@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Small, hand-authored fixture reproducing the real, live HTTP 404
+     response body shape observed for a syntactically valid but
+     non-existent frame ID
+     (docs/database-evidence/second-organism/raw/biocyc/
+     20_probe_missing_frame.xml, DX-53: getxml?ECOLI:NOT-A-REAL-FRAME-DX53).
+     Trimmed to the one sentence the classifier actually keys on. -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:NOT-A-REAL-FRAME-DX53'>
+<error>The object NOT-A-REAL-FRAME-DX53 was not found in database ECOLI.</error>
+</ptools-xml>

@@ -1,20 +1,23 @@
 ---
 name: discovery-token-usage
 description: |
-  Mine a Discovery App workspace's .discovery/ exhaust for token usage across
-  engines (Clio / Science Engine, copilot-cli / Mission Control / Generic
-  Copilot), models, and interactive chat. Produces a console read-out by
-  default; can also emit a markdown report on request. Cost / billing-multiplier
-  data is a FEATURE FLAG — never surface it unless the user explicitly asks
-  ("with cost", "include cost", "--with-cost", "premium units"). Handles seven
-  data-quality traps (double-emitted stderr, corrupt journal appends, cumulative
-  checkpoints, router duplicates, cached-read-in-realInput, etc). WHEN:
-  "token usage", "how many tokens", "tokens in/out", "Discovery exhaust",
-  "engine spend", "Clio vs copilot-cli", "mine .discovery/", "engine token
-  read-out", "which model used the most tokens", "prompt inventory",
-  "session_shutdown metrics", "TokenJournal".
+  Cross-domain / Research platform observability — Mine a Discovery App
+  workspace's .discovery/ exhaust for token usage across engines (Clio /
+  Science Engine, copilot-cli / Mission Control / Generic Copilot), models,
+  and interactive chat. Produces a console read-out by default; can also emit
+  a markdown report on request. Cost / billing-multiplier data is a FEATURE
+  FLAG — never surface it unless the user explicitly asks ("with cost",
+  "include cost", "--with-cost", "premium units"). Handles seven data-quality
+  traps (double-emitted stderr, corrupt journal appends, cumulative
+  checkpoints, router duplicates, cached-read-in-realInput, etc). WHEN: "token
+  usage", "how many tokens", "tokens in/out", "Discovery exhaust", "engine
+  spend", "Clio vs copilot-cli", "mine .discovery/", "engine token read-out",
+  "which model used the most tokens", "prompt inventory", "session_shutdown
+  metrics", "TokenJournal".
 metadata:
   version: "1"
+  category: "Cross-domain"
+  subfield: "Research platform observability"
 ---
 
 # discovery-token-usage — Discovery App Token Miner

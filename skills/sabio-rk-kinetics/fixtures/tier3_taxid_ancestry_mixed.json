@@ -1,0 +1,36 @@
+{
+  "_fixture_note": "Synthetic tier-3 (EC-only) response: entry 201's own lineage array contains the *current* NCBI phylum name 'Pseudomonadota' (never the retired 'Proteobacteria' string), so a literal-string match against the retired name would silently drop it -- the exact class of bug this skill's taxid-ancestry classification exists to catch. Entry 202 has an empty lineage array (must classify as unknown_empty_lineage, never a match). Entry 203 belongs to an unrelated phylum.",
+  "meta": {"page": 1, "page_size": 100, "total_count": 3, "total_pages": 1},
+  "data": [
+    {
+      "id": 201,
+      "general": {
+        "organism": {"id": 201, "name": "Pseudomonas putida", "ncbi_taxonomy_id": 303, "ncbi_taxonomy_lineage": ["Bacteria", "Pseudomonadota", "Gammaproteobacteria"]},
+        "strain": {"id": null, "name": null},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [{"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 1.1, "unit": {"name": "mM"}}]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    },
+    {
+      "id": 202,
+      "general": {
+        "organism": {"id": 202, "name": "Unclassified bacterium", "ncbi_taxonomy_id": 90371, "ncbi_taxonomy_lineage": []},
+        "strain": {"id": null, "name": null},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [{"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 2.2, "unit": {"name": "mM"}}]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    },
+    {
+      "id": 203,
+      "general": {
+        "organism": {"id": 203, "name": "Saccharomyces cerevisiae", "ncbi_taxonomy_id": 4932, "ncbi_taxonomy_lineage": ["Eukaryota", "Fungi", "Ascomycota"]},
+        "strain": {"id": null, "name": null},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [{"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 3.3, "unit": {"name": "mM"}}]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    }
+  ]
+}

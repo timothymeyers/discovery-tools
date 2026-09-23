@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Small, hand-trimmed fixture derived from a real, retained BioCyc/EcoCyc
+     getxml response (docs/database-evidence/second-organism/raw/biocyc/
+     01_reaction_pgi.xml, DX-53). EcoCyc is a BioCyc "Open Database" per the
+     Limited Use License, redistributable for any purpose with attribution
+     (see ../references/access-routes-and-terms.md). Trimmed only to drop
+     unrelated synonyms/credits/comments; every remaining tag/value is
+     faithful to the live response. -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:PGLUCISOM-RXN'><metadata><url>http://BioCyc.org/</url>
+<service_name>getxml</service_name>
+<query>ECOLI:PGLUCISOM-RXN</query>
+<num_results>1</num_results>
+<PGDB orgid='ECOLI' version='30.0'><species datatype='string'>Escherichia coli</species>
+<strain datatype='string'>K-12 substr. MG1655</strain>
+<dblink><dblink-db>NCBI-TAXONOMY-DB</dblink-db>
+<dblink-oid>511145</dblink-oid>
+<dblink-relationship>unification</dblink-relationship>
+</dblink>
+</PGDB>
+</metadata>
+<Reaction ID='ECOLI:PGLUCISOM-RXN' orgid='ECOLI' frameid='PGLUCISOM-RXN' detail='full'>
+<ec-number>EC-5.3.1.9<official>T</official>
+</ec-number>
+<in-pathway><Pathway resource='getxml?ECOLI:GLYCOLYSIS' orgid='ECOLI' frameid='GLYCOLYSIS'/><Pathway resource='getxml?ECOLI:UDPNAGSYN-PWY' orgid='ECOLI' frameid='UDPNAGSYN-PWY'/></in-pathway>
+<physiologically-relevant datatype='boolean'>true</physiologically-relevant>
+<enzymatic-reaction><Enzymatic-Reaction ID='ECOLI:PGLUCISOM-ENZRXN' orgid='ECOLI' frameid='PGLUCISOM-ENZRXN' detail='low'><enzyme><Protein resource='getxml?ECOLI:CPLX0-7877' orgid='ECOLI' frameid='CPLX0-7877'/></enzyme>
+<common-name datatype='string'>glucose-6-phosphate isomerase</common-name>
+</Enzymatic-Reaction>
+<Enzymatic-Reaction ID='ECOLI:ENZRXN0-12536' orgid='ECOLI' frameid='ENZRXN0-12536' detail='low'><enzyme><Protein resource='getxml?ECOLI:CPLX-8401' orgid='ECOLI' frameid='CPLX-8401'/></enzyme>
+<common-name datatype='string'>glucose-6-phosphate isomerase</common-name>
+</Enzymatic-Reaction>
+</enzymatic-reaction>
+<reaction-direction>REVERSIBLE</reaction-direction>
+<left><Compound resource='getxml?ECOLI:ALPHA-GLC-6-P' orgid='ECOLI' frameid='ALPHA-GLC-6-P'/></left>
+<right><Compound resource='getxml?ECOLI:FRUCTOSE-6P' orgid='ECOLI' frameid='FRUCTOSE-6P'/></right>
+</Reaction>
+</ptools-xml>

@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://www.brenda-enzymes.org/schemas/2.0.0/enzyme.schema.json",
+  "title": "BRENDA enzyme data",
+  "description": "Contents of a BRENDA enzyme entry.\nThis is part of the BRENDA json download file.",
+  "type": "object",
+  "required": ["id", "recommended_name"],
+  "properties": {
+      "id": {
+        "type": "string",
+        "description": "Unique identifier of the enzyme. For enzymes, the Enzyme Commission number (EC Number) given by the IUBMB (International Union of Biochemistry and Molecular Biology), classes of enzymes und subclasses based on the reaction they catalyze. For spontaneous, non-enzymatic reactions the id is `spontaneous`.",
+        "pattern": "^(?:[1-7]\\.[1-9][0-9]{0,2}\\.[1-9][0-9]{0,2}\\.B?[1-7][0-9]{0,2})|spontaneous$"
+      },
+      "history": {
+        "type": "string",
+        "description": "Information about when EC number has been deleted or transferred."
+      },
+      "recommended_name": {
+        "type": "string",
+        "description": "The recommended or accepted name of an enzyme as given by the IUBMB."
+      },
+      "systematic_name": {
+        "type": "string",
+        "description": "The systematic name fields provides a chemically more precise name and is usaually based on the substrate or, in the case of a bimolecular reaction, of the two substrates separated by a colon, and the nature of the reaction."
+      },
+      "synonyms": {
+        "type": "array",
+        "description": "Synonyms comprise names by which an enzyme is known. The names are found found in other databases or in the literature, abbreviations, names of commercially available products or gene names.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "application": {
+        "type": "array",
+        "description": "Actual or possible application in the fields of i.e. pharmacology, medicine, biofuel production, analysis, biotechnology etc. are described.",
+        "items": { "$ref": "#/$defs/text_dataset"}
+      },
+      "reaction_type": {
+        "type": "array",
+        "description": "According to the type of reaction, the enzymes catalyze, enzymes are classified into 7 main classes, oxidoreductases, transferases, hydrolases, lyases, isomerases, ligases, and translocases with several subcategories, i.e. addition, elimination, carboxylation etc.",
+        "items": { "$ref": "#/$defs/text_dataset"}
+      },
+      "crystallization": {
+        "type": "array",
+        "description": "Information on the X-ray structure of an enzyme and the procedure and conditions of the crystallization are described.",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "purification": {
+        "type": "array",
+        "description": "Information on the renaturation, refolding and reactivation procedures of enzymes after denaturation processes. ",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "renatured": {
+        "type": "array",
+        "description": "This data field contains information on the renaturation, refolding and reactivation procedures of enzymes after denaturation processes.",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "general_stability": {
+        "type": "array",
+        "description": "General information on enzyme stability.",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "oxidation_stability": {
+        "type": "array",
+        "description": "The influence of oxidating agents on enzyme stability.",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "storage_stability": {
+        "type": "array",
+        "description": "The influence of storage duration and conditions such as temperature, pH, additives etc. on the enzyme stability and activity.",
+        "items": { "$ref": "#/$defs/dataset"}
+      },
+      "reaction": {
+        "type": "array",
+        "description": "The reaction as defined by the IUBMB (International Union of Biochemistry and Molecular Biology).",
+        "items": { "$ref": "#/$defs/text_dataset"}
+      },
+      "natural_substrates_products": {
+        "type": "array",
+        "description": "Substrates and products in the metabolism of the cell in vivo, under physiological conditions. A natural substrate and/or product is only given if it is specified in the literature reference.",
+        "items": { "$ref": "#/$defs/text_dataset"}
+      },
+      "substrates_products": {
+        "type": "array",
+        "description": "All natural or synthetic substrates and products are listed here (not in stoichiometric quantities). In cases with unclear product formation only a '?' as a dummy is given. The reversibility of the reaction is given here in {...} r=reversible, ir=irreversible.",
+        "items": { "$ref": "#/$defs/text_dataset"}
+      },
+
+      "turnover_number": {
+        "type": "array",
+        "description": "The turnover number (kcat) is given in the unit 1/s. Each value is connected to a substrate name in {...}.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "km_value": {
+        "type": "array",
+        "description": "The Michaelis-Menten value of the enzyme in mM. Each value is connected to a substrate name.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "ph_optimum": {
+        "type": "array",
+        "description": "The pH where the enzymes activity is at its maximum.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "ph_range": {
+        "type": "array",
+        "description": "pH range in which the enzyme is active.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "ph_stability": {
+        "type": "array",
+        "description": "This field can either give a range or a single value in which the enzyme has its optimal stability.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "specific_activity": {
+        "type": "array",
+        "description": "The specific activity of the enzyme in µmol/min/mg.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "temperature_optimum": {
+        "type": "array",
+        "description": "The temperature where the enzymes activity is at its maximum in °C.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "temperature_range": {
+        "type": "array",
+        "description": "Temperature range in which the enzyme is active in °C.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "temperature_stability": {
+        "type": "array",
+        "description": "The temperature stability is given in °C. This field can either give a range or a single value in which the enzyme is stable.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "molecular_weight": {
+        "type": "array",
+        "description": "The molecular weight of the holoenzyme. For monomeric enzymes the MW is identical to the value given for subunits.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "pi_value": {
+        "type": "array",
+        "description": "Isoelectric point of the enzyme, the pH value at which the protein carries no net electrical charge.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "ki_value": {
+        "type": "array",
+        "description": "The inhibition constant in mM. Each value is connected to an inhibitor in {...}",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "ic50_value": {
+        "type": "array",
+        "description": "The half maximal inhibitory concentration of a compund in mM. Each value is connected to an inhibitor in {...}.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+      "kcat_km_value": {
+        "type": "array",
+        "description": "The catalytic efficiency of the enzyme in mM/s. Each value is connected to a substrate in {...}.",
+        "items": { "$ref": "#/$defs/numeric_dataset" }
+      },
+
+      "localization": {
+        "type": "array",
+        "description": "The intracellular localization of the enzyme.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "source_tissue": {
+        "type": "array",
+        "description": "For multicellular organisms the tissues used for isolation of the enzyme or the tissue in which the enzyme is present. Cell-lines can also be a source of enzymes.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "activating_compound": {
+        "type": "array",
+        "description": "Compounds that have positive effects on the activity of the enzyme, except metal ions and cofactors.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "inhibitor": {
+        "type": "array",
+        "description": "Compounds found to be inhibitory to the enzyme.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "metals_ions": {
+        "type": "array",
+        "description": "The ions or salts that have activating effects, or are closely bound to the enzyme.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "posttranslational_modification": {
+        "type": "array",
+        "description": "This field describes covalent and general enzyme modifications following protein biosynthesis.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "subunits": {
+        "type": "array",
+        "description": "The tertiary structure of the active enzyme is described. It can be active as a monomer, dimer, trimer etc. The stoichiometry of the subunits is given. ",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "cofactor": {
+        "type": "array",
+        "description": "All compounds which participate in the reaction, which are loosely-bound to the protein and are required for the enzyme activity, whereas prosthetic groups are tightly-bound to the enzyme.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "protein_variants": {
+        "type": "array",
+        "description": "The properties of modified enzyme proteins are described. The modification could be i.e. natural occurring mutations, site-directed mutagenesis, deletions etc. In most cases the amino acid exchanges are given.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "cloned": {
+        "type": "array",
+        "description": "Information on expresssion and cloning procedures and systems are given and in which organism or cell culture an enzyme is expressed in.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "organic_solvent_stability": {
+        "type": "array",
+        "description": "The enzyme stability in presence of organic solvents is described. ",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "expression": {
+        "type": "array",
+        "description": "This information field describes the effect of compounds and/or conditions on the expression of enzymes leading to an up- or downregulation.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+      "general_information": {
+        "type": "array",
+        "description": "This field contains more general information on the role of an enzyme in the metabolism, the physiological function, a possible malfunction, or evolutionary aspects.",
+        "items": { "$ref": "#/$defs/text_dataset" }
+      },
+
+      "protein": {
+        "type": "object",
+        "description": "Protein/gene accessions associated with the data field.",
+        "patternProperties": {
+          "^[1-9][0-9]{0,}$": { "$ref": "#/$defs/protein_dataset" }
+        }
+      },
+      "reference": {
+        "type": "object",
+        "description": "The references associated with the data field.",
+        "patternProperties": {
+          "^[1-9][0-9]{0,}$": { "$ref": "#/$defs/reference_dataset" }
+        }
+      }
+  },
+  "additionalProperties": false,
+  "$defs": {
+
+    "dataset": {
+      "comment": { "type": "string" },
+      "proteins": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "[1-9][0-9]{0,}" } },
+      "references": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "[1-9][0-9]{0,}" } }
+    },
+
+    "text_dataset": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/dataset" }],
+      "properties": {
+        "value": { "type": "string" }
+      }
+    },
+
+    "numeric_dataset": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/$defs/dataset" }],
+      "properties": {
+        "value": { "type": "string" }
+      }
+    },
+
+    "protein_dataset": {
+      "type": "object",
+      "required": ["id", "organism", "references"],
+      "properties": {
+	"id": { "type": "string", "pattern": "[1-9][0-9]{0,}" },
+	"organism": { "type": "string" },
+        "accessions": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+	"references": { "type": "array", "minItems": 1, "items": { "type": "string", "pattern": "[1-9][0-9]{0,}" } },
+	"comment" : { "type": "string" },
+        "source": { "enum": ["uniprot", "genbank", "swissprot", "trembl"] }
+      }
+    },
+
+    "reference_dataset": {
+      "type": "object",
+      "required": ["title", "authors", "journal", "year"],
+      "properties": {
+        "id": { "type": "string", "pattern": "[1-9][0-9]{0,}" },
+        "title": { "type": "string" },
+        "authors": { "type": "array", "minItems": 1, "items": { "type": "string" }},
+        "journal": { "type": "string" },
+        "year": { "type": "integer", "minimum": 1600 },
+        "pages": { "type": "string" },
+        "vol": { "type": "string" },
+        "pmid": { "type": "integer" }
+      }
+    }
+  }
+}

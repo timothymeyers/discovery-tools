@@ -1,10 +1,11 @@
 ---
 name: osti-literature-search
 description: |
-  Search and retrieve DOE-funded scientific literature from OSTI.GOV using
-  `osti-axi`, a third-party read-only CLI. NOTE: this skill is a POINTER — the
-  tool is NOT bundled with this catalog and must be installed separately from
-  its own repository, with the user's explicit consent. Use for finding papers,
+  Cross-domain / Scientific literature retrieval — Search and retrieve
+  DOE-funded scientific literature from OSTI.GOV using `osti-axi`, a
+  third-party read-only CLI. NOTE: this skill is a POINTER — the tool is NOT
+  bundled with this catalog and must be installed separately from its own
+  repository, with the user's explicit consent. Use for finding papers,
   reports, and datasets funded by the U.S. Department of Energy, pulling a
   record's abstract and resource links, and downloading OSTI-provided PDF/text
   full text into the workspace. WHEN: search OSTI, OSTI.GOV, DOE research
@@ -14,8 +15,8 @@ description: |
   national lab project.
 metadata:
   version: "1"
-  tool-status: external-pointer
-  upstream: https://github.com/davenovelli-pnnl/osti-axi
+  category: "Cross-domain"
+  subfield: "Scientific literature retrieval"
 ---
 
 # osti-literature-search — OSTI.GOV literature retrieval (external tool)

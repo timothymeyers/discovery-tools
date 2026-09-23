@@ -1,0 +1,4 @@
+# Runtime dependencies. `gh skill install` and plugin install do NOT install
+# these — install them yourself before running the scripts.
+PyYAML>=6.0
+jsonschema>=4.0

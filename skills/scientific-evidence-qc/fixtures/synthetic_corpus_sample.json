@@ -1,0 +1,93 @@
+{
+  "_comment": "Fully synthetic (fabricated) reaction-evidence-schema-shaped records for offline exercising of this skill's scripts. Not real evidence, not tied to any real project, organism, or database record.",
+  "records": [
+    {
+      "schema_version": "1.0.0",
+      "record_id": "synthetic-law-001-km",
+      "evidence_type": "kinetic_parameter",
+      "provenance": {
+        "source_database": "other",
+        "source_record_id": "synthetic-law-001",
+        "access_method": "other"
+      },
+      "kinetics": {
+        "parameter_type": {"state": "present", "raw_value": "Km", "normalized_value": "Km"},
+        "parameter_value": {
+          "state": "present",
+          "raw_value": 0.5,
+          "normalized_value": 0.0005,
+          "unit_raw": "mM",
+          "unit_normalized": "M"
+        }
+      },
+      "publication": {
+        "pubmed": {"source": "pubmed", "state": "present", "id": "SYN0001"}
+      }
+    },
+    {
+      "schema_version": "1.0.0",
+      "record_id": "synthetic-law-001-kcat",
+      "evidence_type": "kinetic_parameter",
+      "provenance": {
+        "source_database": "other",
+        "source_record_id": "synthetic-law-001",
+        "access_method": "other"
+      },
+      "kinetics": {
+        "parameter_type": {"state": "present", "raw_value": "kcat", "normalized_value": "kcat"},
+        "parameter_value": {
+          "state": "present",
+          "raw_value": 12.0,
+          "normalized_value": 12.0,
+          "unit_raw": "s-1",
+          "unit_normalized": "s-1"
+        }
+      },
+      "publication": {
+        "pubmed": {"source": "pubmed", "state": "present", "id": "SYN0001"}
+      }
+    },
+    {
+      "schema_version": "1.0.0",
+      "record_id": "synthetic-law-002-km",
+      "evidence_type": "kinetic_parameter",
+      "provenance": {
+        "source_database": "other",
+        "source_record_id": "synthetic-law-002",
+        "access_method": "other"
+      },
+      "kinetics": {
+        "parameter_type": {"state": "present", "raw_value": "Km", "normalized_value": "Km"},
+        "parameter_value": {
+          "state": "unknown"
+        }
+      },
+      "publication": {
+        "pubmed": {"source": "pubmed", "state": "present", "id": "SYN0002"}
+      }
+    },
+    {
+      "schema_version": "1.0.0",
+      "record_id": "synthetic-law-003-ic50",
+      "evidence_type": "kinetic_parameter",
+      "provenance": {
+        "source_database": "other",
+        "source_record_id": "synthetic-law-003",
+        "access_method": "other"
+      },
+      "kinetics": {
+        "parameter_type": {"state": "present", "raw_value": "IC50", "normalized_value": "IC50"},
+        "parameter_value": {
+          "state": "present",
+          "raw_value": 3.0,
+          "normalized_value": 3.0,
+          "unit_raw": "furlongs_per_fortnight",
+          "unit_normalized": "furlongs_per_fortnight_si"
+        }
+      },
+      "publication": {
+        "pubmed": {"source": "pubmed", "state": "present", "id": "SYN0001"}
+      }
+    }
+  ]
+}

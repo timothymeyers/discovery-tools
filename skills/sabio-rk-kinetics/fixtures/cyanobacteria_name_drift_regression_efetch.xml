@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!-- Synthetic, redistributable NCBI Taxonomy efetch response fixture (not a
+     live capture) reproducing the exact historical name-drift bug this
+     skill's taxid-ancestry classification exists to catch: taxid 1148
+     (Synechocystis sp.) whose ancestor chain includes fallback taxid 1117
+     (current NCBI name "Cyanobacteriota", never the retired
+     "Cyanobacteria" string a name-literal filter would search for), plus
+     taxid 4932 (Saccharomyces cerevisiae) with an unrelated ancestor chain,
+     used here only to exercise the "no match" path. -->
+<TaxaSet>
+  <Taxon>
+    <TaxId>1148</TaxId>
+    <ScientificName>Synechocystis sp.</ScientificName>
+    <LineageEx>
+      <Taxon><TaxId>2</TaxId><ScientificName>Bacteria</ScientificName><Rank>superkingdom</Rank></Taxon>
+      <Taxon><TaxId>1117</TaxId><ScientificName>Cyanobacteriota</ScientificName><Rank>phylum</Rank></Taxon>
+      <Taxon><TaxId>1129</TaxId><ScientificName>Synechococcales</ScientificName><Rank>order</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+  <Taxon>
+    <TaxId>4932</TaxId>
+    <ScientificName>Saccharomyces cerevisiae</ScientificName>
+    <LineageEx>
+      <Taxon><TaxId>2759</TaxId><ScientificName>Eukaryota</ScientificName><Rank>superkingdom</Rank></Taxon>
+      <Taxon><TaxId>4890</TaxId><ScientificName>Ascomycota</ScientificName><Rank>phylum</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+</TaxaSet>

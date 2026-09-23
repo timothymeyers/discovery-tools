@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/03_reaction_zwf.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:GLU6PDEHYDROG-RXN'><metadata><PGDB orgid='ECOLI' version='30.0'><species datatype='string'>Escherichia coli</species><strain datatype='string'>K-12 substr. MG1655</strain><dblink><dblink-db>NCBI-TAXONOMY-DB</dblink-db><dblink-oid>511145</dblink-oid></dblink></PGDB></metadata>
+<Reaction ID='ECOLI:GLU6PDEHYDROG-RXN' orgid='ECOLI' frameid='GLU6PDEHYDROG-RXN' detail='full'>
+<ec-number>EC-1.1.1.49<official>T</official>
+</ec-number>
+<in-pathway><Pathway resource='getxml?ECOLI:GLYCOLYSIS-E-D' orgid='ECOLI' frameid='GLYCOLYSIS-E-D'/><Pathway resource='getxml?ECOLI:OXIDATIVEPENT-PWY' orgid='ECOLI' frameid='OXIDATIVEPENT-PWY'/></in-pathway>
+<physiologically-relevant datatype='boolean'>true</physiologically-relevant>
+<enzymatic-reaction><Enzymatic-Reaction ID='ECOLI:GLU6PDEHYDROG-ENZRXN' orgid='ECOLI' frameid='GLU6PDEHYDROG-ENZRXN' detail='low'><enzyme><Protein resource='getxml?ECOLI:GLU6PDEHYDROG-MONOMER' orgid='ECOLI' frameid='GLU6PDEHYDROG-MONOMER'/></enzyme>
+<common-name datatype='string'>NADP+-dependent glucose-6-phosphate dehydrogenase</common-name>
+</Enzymatic-Reaction>
+</enzymatic-reaction>
+<reaction-direction>LEFT-TO-RIGHT</reaction-direction>
+<left><Compound resource='getxml?ECOLI:D-glucopyranose-6-phosphate' orgid='ECOLI' frameid='D-glucopyranose-6-phosphate' class='true'/></left>
+<left><Compound resource='getxml?ECOLI:NADP' orgid='ECOLI' frameid='NADP'/></left>
+<right><Compound resource='getxml?ECOLI:D-6-P-GLUCONO-DELTA-LACTONE' orgid='ECOLI' frameid='D-6-P-GLUCONO-DELTA-LACTONE'/></right>
+<right><Compound resource='getxml?ECOLI:NADPH' orgid='ECOLI' frameid='NADPH'/></right>
+</Reaction>
+</ptools-xml>

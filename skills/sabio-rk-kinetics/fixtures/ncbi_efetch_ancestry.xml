@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!-- Synthetic, redistributable NCBI Taxonomy efetch response fixture (not a
+     live capture) covering: taxid 303 (Pseudomonas putida) whose ancestor
+     chain includes fallback taxid 1224 (Pseudomonadota); confirms
+     taxid-ancestry matching succeeds even though the entry's own lineage
+     array in SABIO-RK never spells out "1224"; and taxid 4932
+     (Saccharomyces cerevisiae) with an unrelated ancestor chain. -->
+<TaxaSet>
+  <Taxon>
+    <TaxId>303</TaxId>
+    <ScientificName>Pseudomonas putida</ScientificName>
+    <LineageEx>
+      <Taxon><TaxId>2</TaxId><ScientificName>Bacteria</ScientificName><Rank>superkingdom</Rank></Taxon>
+      <Taxon><TaxId>1224</TaxId><ScientificName>Pseudomonadota</ScientificName><Rank>phylum</Rank></Taxon>
+      <Taxon><TaxId>1236</TaxId><ScientificName>Gammaproteobacteria</ScientificName><Rank>class</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+  <Taxon>
+    <TaxId>4932</TaxId>
+    <ScientificName>Saccharomyces cerevisiae</ScientificName>
+    <LineageEx>
+      <Taxon><TaxId>2759</TaxId><ScientificName>Eukaryota</ScientificName><Rank>superkingdom</Rank></Taxon>
+      <Taxon><TaxId>4890</TaxId><ScientificName>Ascomycota</ScientificName><Rank>phylum</Rank></Taxon>
+    </LineageEx>
+  </Taxon>
+</TaxaSet>

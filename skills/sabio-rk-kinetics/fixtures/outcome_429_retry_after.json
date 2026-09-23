@@ -1,0 +1,6 @@
+{
+  "_fixture_note": "Synthetic HTTP 429 response body + headers fixture. Retry-After header value is deliberately an integer-seconds string per RFC 9110; the client must sleep exactly that long (via the injected sleep_fn) rather than falling back to a computed default, then retry.",
+  "http_status": 429,
+  "headers": {"Retry-After": "2", "Content-Type": "application/json"},
+  "body": {"error": "rate_limit_exceeded", "message": "60 requests per 60 seconds exceeded"}
+}

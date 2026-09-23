@@ -1,0 +1,29 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://www.brenda-enzymes.org/schemas/2.0.0/brenda.schema.json",
+    "title": "BRENDA Enzyme Database - JSON download file",
+    "description": "Contents of the BRENDA json download file.\nDownload is avaliable at [www.brenda-enzymes.org](https://www.brenda-enzymes.org/download.php).",
+    "type": "object",
+    "required": ["release", "version", "data"],
+    "properties": {
+        "release": {
+            "type": "string",
+            "pattern": "2[0-9]{3}\\.(?:1|2)",
+            "description": "The BRENDA release number of the data."
+        },
+        "version": {
+            "type": "string",
+            "description": "The version number of the schema used."
+        },
+        "data": {
+            "type": "object",
+            "description": "All data entries for annotated enzymes.",
+            "patternProperties": {
+                "^(?:[1-7]\\.[1-9][0-9]{0,2}\\.[1-9][0-9]{0,2}\\.B?[1-7][0-9]{0,2})|spontaneous$": {
+                    "$ref": "https://www.brenda-enzymes.org/schemas/2.0.0/enzyme.schema.json"
+                }
+            }
+        }
+    },
+    "additionalProperties": false
+}

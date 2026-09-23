@@ -1,21 +1,21 @@
 ---
 name: discovery-dashboard
 description: |
-  Stand up a read-only live operations dashboard for a Microsoft Discovery
-  workspace by scraping its `.discovery/` directory and git. Shows leaf-task
-  progress with approved-complete and awaiting-review kept strictly separate,
-  the executing / ready / blocked work front derived from live `dependsOn`
-  edges, engine liveness verified against real process identity, agent runs
-  deduplicated across an alias graph, observed CLIO investigations, a typed
-  live log, git activity with `.discovery` churn filtered out, and an explicit
-  coverage panel separating "could not read" from "genuinely empty". Never
-  writes to the workspace. Portable across Discovery Express 0.15.13-0.15.15.
-  WHEN: "project dashboard", "discovery dashboard", "what's the status of this
-  project", "what's stuck", "how close are we to done", "are the engines still
-  running", "is anything running", "are any agents running", "is clio running",
-  "any investigations running", "open the dashboard", "show me project status".
+  Cross-domain / Research platform observability — Read-only live operations
+  dashboard for a Microsoft Discovery workspace, built by scraping
+  `.discovery/` and git. Shows leaf-task progress with approved-complete and
+  awaiting-review kept strictly separate, the executing / ready / blocked work
+  front from live `dependsOn` edges, engine liveness verified against real
+  process identity, agent runs deduplicated across an alias graph, observed
+  CLIO investigations, and a coverage panel separating "could not read" from
+  "genuinely empty". Never writes to the workspace. WHEN: "project dashboard",
+  "discovery dashboard", "what's the status of this project", "what's stuck",
+  "how close are we to done", "are the engines still running", "is anything
+  running", "are any agents running", "is clio running", "open the dashboard".
 metadata:
   version: "1"
+  category: "Cross-domain"
+  subfield: "Research platform observability"
 ---
 
 # discovery-dashboard — Discovery workspace live operations

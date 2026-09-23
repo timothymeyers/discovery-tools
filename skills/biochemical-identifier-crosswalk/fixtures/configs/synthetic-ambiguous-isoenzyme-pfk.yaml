@@ -1,0 +1,124 @@
+# SYNTHETIC FIXTURE -- not grounded evidence.
+#
+# Purpose: exercise the config-driven builder/validator on an
+# AMBIGUOUS-REACTION / isoenzyme case: one EC class (phosphofructokinase-like,
+# EC 2.7.1.11) resolving to two paralogous enzyme accessions where the
+# in-scope sources do not resolve which paralog matches the model-relevant
+# activity -- the same shape as the real, already-verified DX-27 GAPDH
+# gap1/gap2 case, but kept fully synthetic here.
+#
+# TODO(workstream-3): once workstream 3 lands the real PFK isoenzyme
+# evidence (grounded Rhea/ChEBI/UniProt records, not placeholders), retire
+# this fixture in favor of that data so the crosswalk skill's isoenzyme test
+# coverage is backed by an actually-retrieved ambiguous case rather than a
+# synthetic stand-in.
+#
+# All identifiers below are deliberately out-of-range placeholders.
+entries:
+  - entry_id: fixture-enzyme-pfk-paralog-a
+    entity_type: enzyme
+    canonical_name: "phosphofructokinase paralog A (FIXTURE placeholder, EC 2.7.1.11)"
+    ec_number: "2.7.1.11"
+    identifiers:
+      model_native:
+        - source: model_native
+          id: "FIXLOCUS0001 (pfkA-like)"
+          state: present
+          method: locus_tag_reuse
+          confidence: low
+          source_version: "FIXTURE placeholder -- not a real project artifact"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "A genome locus tag reused as the nearest existing identifier. A locus tag is NOT itself a model-native reaction ID claim."
+      uniprot:
+        - source: uniprot
+          id: "P0FIX01"
+          state: present
+          method: rest_api_lookup
+          confidence: medium
+          source_version: "FIXTURE placeholder"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "Only a generic EC (2.7.1.11) annotation on file; not confirmed as the model-relevant paralog."
+      ec:
+        - source: ec
+          id: "2.7.1.11"
+          state: present
+          method: ec_number_match
+          confidence: low
+          source_version: "FIXTURE placeholder"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "Shared EC class only; NOT sufficient alone to prove which paralog is the model-relevant enzyme (many-to-many bridge)."
+    ambiguity:
+      isoenzyme:
+        applies: true
+        state: unknown
+        description: >
+          Two paralogous enzymes (this entry and fixture-enzyme-pfk-paralog-b)
+          both carry the same generic EC 2.7.1.11 annotation. No in-scope
+          source in this fixture resolves which paralog corresponds to which
+          physiological activity; both are retained rather than guessed.
+        alternatives: ["fixture-enzyme-pfk-paralog-b"]
+    provenance:
+      retrieved_at: "2026-09-22T00:00:00Z"
+      compiled_by: "biochemical-identifier-crosswalk skill fixture (synthetic, ambiguous isoenzyme)"
+      upstream_tasks: ["DX-40"]
+    transformation_history:
+      - timestamp: "2026-09-22T00:00:00Z"
+        actor: "scripts/build_crosswalk.py"
+        operation: "manual_curation"
+        description: "Synthetic isoenzyme-ambiguity fixture; only identity evidence present is ec_number_match, which the builder must flag as identity-unconfirmed."
+
+  - entry_id: fixture-enzyme-pfk-paralog-b
+    entity_type: enzyme
+    canonical_name: "phosphofructokinase paralog B (FIXTURE placeholder, EC 2.7.1.11)"
+    ec_number: "2.7.1.11"
+    identifiers:
+      model_native:
+        - source: model_native
+          id: "FIXLOCUS0002 (pfkB-like)"
+          state: present
+          method: locus_tag_reuse
+          confidence: low
+          source_version: "FIXTURE placeholder -- not a real project artifact"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "A genome locus tag reused as the nearest existing identifier. A locus tag is NOT itself a model-native reaction ID claim."
+      uniprot:
+        - source: uniprot
+          id: "P0FIX02"
+          state: present
+          method: rest_api_lookup
+          confidence: medium
+          source_version: "FIXTURE placeholder"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "Only a generic EC (2.7.1.11) annotation on file; not confirmed as the model-relevant paralog."
+      ec:
+        - source: ec
+          id: "2.7.1.11"
+          state: present
+          method: ec_number_match
+          confidence: low
+          source_version: "FIXTURE placeholder"
+          evidence_ref: "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "Shared EC class only; NOT sufficient alone to prove which paralog is the model-relevant enzyme (many-to-many bridge)."
+    ambiguity:
+      isoenzyme:
+        applies: true
+        state: unknown
+        description: >
+          Paralog of fixture-enzyme-pfk-paralog-a under the same generic EC
+          class; unresolved for the same reason.
+        alternatives: ["fixture-enzyme-pfk-paralog-a"]
+    provenance:
+      retrieved_at: "2026-09-22T00:00:00Z"
+      compiled_by: "biochemical-identifier-crosswalk skill fixture (synthetic, ambiguous isoenzyme)"
+      upstream_tasks: ["DX-40"]
+    transformation_history:
+      - timestamp: "2026-09-22T00:00:00Z"
+        actor: "scripts/build_crosswalk.py"
+        operation: "manual_curation"
+        description: "Synthetic isoenzyme-ambiguity fixture; only identity evidence present is ec_number_match, which the builder must flag as identity-unconfirmed."

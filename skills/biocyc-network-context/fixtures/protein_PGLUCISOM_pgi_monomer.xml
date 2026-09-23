@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/09_monomer_pgi_a.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:PGLUCISOM'>
+<Protein ID='ECOLI:PGLUCISOM' orgid='ECOLI' frameid='PGLUCISOM' detail='full'>
+<common-name datatype='string'>glucose-6-phosphate isomerase</common-name>
+<gene><Gene resource='getxml?ECOLI:EG10702' orgid='ECOLI' frameid='EG10702'/></gene>
+</Protein>
+</ptools-xml>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/19_pathway_ppp.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:OXIDATIVEPENT-PWY'>
+<Pathway ID='ECOLI:OXIDATIVEPENT-PWY' orgid='ECOLI' frameid='OXIDATIVEPENT-PWY' detail='full'>
+<common-name datatype='string'>pentose phosphate pathway (oxidative branch) I</common-name>
+</Pathway>
+</ptools-xml>

@@ -1,19 +1,20 @@
 ---
 name: discovery-design-tasks
 description: |
-  Generate a Microsoft Discovery task design (markdown only) for a user-specified local-
-  app or cloud-service Foundry agent set using one (or all) of the three advanced
-  investigation patterns: Deterministic, Guided Exploration, and Autonomous Research. For
-  cloud-service task design or task creation, first look for a Discovery MCP server or
-  Discovery proxy to resolve cloud workspaces, projects, agents, investigations, and
-  tasks; if none is available, try Azure CLI before asking the user for another access
-  route. Use when asked to plan a Discovery investigation, draft task trees, or choose an
-  investigation pattern for an existing agent set.
-license: MIT
+  Cross-domain / Research methodology and experiment design — Generate a
+  Microsoft Discovery task design (markdown only) for a user-specified local-
+  app or cloud-service Foundry agent set using one (or all) of the three
+  advanced investigation patterns: Deterministic, Guided Exploration, and
+  Autonomous Research. For cloud-service task design or task creation, first
+  look for a Discovery MCP server or Discovery proxy to resolve cloud
+  workspaces, projects, agents, investigations, and tasks; if none is
+  available, try Azure CLI before asking the user for another access route.
+  Use when asked to plan a Discovery investigation, draft task trees, or
+  choose an investigation pattern for an existing agent set.
 metadata:
   version: "1"
-  user-invocable: "true"
-  argument-hint: "Optional: --target local|cloud  --agents all|select  --pattern deterministic|guided|autonomous|all  --out <folder>"
+  category: "Cross-domain"
+  subfield: "Research methodology and experiment design"
 ---
 
 # Discovery Task Design

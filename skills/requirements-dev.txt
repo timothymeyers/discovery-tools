@@ -1,0 +1,3 @@
+# Test-only dependencies for skills that ship a tests/ directory.
+# Runtime dependencies live in each skill's own requirements.txt.
+pytest>=7.0

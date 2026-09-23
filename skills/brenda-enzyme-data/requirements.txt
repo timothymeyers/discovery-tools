@@ -1,0 +1,4 @@
+# Optional runtime dependency. Only scripts/validate_schema.py needs it; the
+# extractor and record builder are standard-library only and work without it.
+# `gh skill install` and plugin install do NOT install this.
+jsonschema>=4.0

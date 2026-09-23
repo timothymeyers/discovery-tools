@@ -1,0 +1,550 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-09-22T22:00:00Z",
+  "source_schema_dependency": "https://discovery.local/schemas/reaction-evidence/1.0.0/reaction-evidence.schema.json",
+  "entries": [
+    {
+      "entry_id": "fixture-rxn-citrate-synthase",
+      "entity_type": "reaction",
+      "canonical_name": "acetyl-CoA + oxaloacetate + H2O => citrate + CoA + H+ (TCA cycle, citrate synthase, EC 2.3.3.1)",
+      "identifiers": {
+        "model_native": [
+          {
+            "source": "model_native",
+            "state": "not_applicable",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "No project model-native reaction ID exists for this fixture reaction."
+          }
+        ],
+        "rhea": [
+          {
+            "source": "rhea",
+            "id": "RHEA:990010",
+            "state": "present",
+            "method": "bulk_export_lookup",
+            "confidence": "high",
+            "source_version": "FIXTURE placeholder -- not a real Rhea release",
+            "evidence_ref": "fixtures/configs/synthetic-non-calvin-citrate-synthase.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "Placeholder LR-direction ID for this synthetic fixture."
+          }
+        ],
+        "chebi": [
+          {
+            "source": "chebi",
+            "state": "not_applicable",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Reaction-level entries carry participants in stoichiometry, not a single chebi mapping."
+          }
+        ],
+        "ec": [
+          {
+            "source": "ec",
+            "id": "2.3.3.1",
+            "state": "present",
+            "method": "direct_xref_file",
+            "confidence": "high",
+            "source_version": "FIXTURE placeholder",
+            "evidence_ref": "fixtures/configs/synthetic-non-calvin-citrate-synthase.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z"
+          }
+        ],
+        "uniprot": [
+          {
+            "source": "uniprot",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "ncbi_taxonomy": [
+          {
+            "source": "ncbi_taxonomy",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "biocyc": [
+          {
+            "source": "biocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "cyanocyc": [
+          {
+            "source": "cyanocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "sabio_rk": [
+          {
+            "source": "sabio_rk",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "brenda_ligand": [
+          {
+            "source": "brenda_ligand",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "kegg": [
+          {
+            "source": "kegg",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "metanetx": [
+          {
+            "source": "metanetx",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ]
+      },
+      "ambiguity": {
+        "direction": {
+          "applies": false,
+          "state": "not_applicable",
+          "description": "Only one biological direction is asserted by the placeholder equation text in this fixture."
+        },
+        "protonation": {
+          "applies": true,
+          "state": "present",
+          "description": "H+ participant is a distinct charge-state ChEBI entity from its conjugate base, per the usual ChEBI protonation-relation pattern; not collapsed."
+        },
+        "compartment": {
+          "applies": true,
+          "state": "unknown",
+          "description": "Rhea/ChEBI reaction and compound definitions are compartment-agnostic (aqueous-phase only). Compartment is 'unknown' unless a project model artifact explicitly asserts a localization for this entity."
+        },
+        "generic_compound": {
+          "applies": false,
+          "state": "not_applicable",
+          "description": "All participants are chemically fully specified (no R-groups/wildcards) in this fixture."
+        },
+        "isoenzyme": {
+          "applies": false,
+          "state": "not_applicable"
+        }
+      },
+      "provenance": {
+        "retrieved_at": "2026-09-22T00:00:00Z",
+        "compiled_by": "biochemical-identifier-crosswalk skill fixture (synthetic, non-Calvin-cycle)",
+        "upstream_tasks": [
+          "DX-40"
+        ]
+      },
+      "transformation_history": [
+        {
+          "timestamp": "2026-09-22T00:00:00Z",
+          "actor": "scripts/build_crosswalk.py",
+          "operation": "manual_curation",
+          "description": "Synthetic fixture authored to exercise a non-Calvin-cycle reaction path (currency-metabolite-heavy TCA reaction) through the config-driven builder/validator."
+        }
+      ],
+      "ec_number": "2.3.3.1",
+      "compartment": "unknown",
+      "stoichiometry": [
+        {
+          "role": "substrate",
+          "chebi_id": "CHEBI:990001",
+          "coefficient": 1,
+          "name": "acetyl-CoA (FIXTURE placeholder ChEBI ID)"
+        },
+        {
+          "role": "substrate",
+          "chebi_id": "CHEBI:990002",
+          "coefficient": 1,
+          "name": "oxaloacetate(2-) (FIXTURE placeholder ChEBI ID)"
+        },
+        {
+          "role": "substrate",
+          "chebi_id": "CHEBI:990003",
+          "coefficient": 1,
+          "name": "H2O (FIXTURE placeholder ChEBI ID)"
+        },
+        {
+          "role": "product",
+          "chebi_id": "CHEBI:990004",
+          "coefficient": 1,
+          "name": "citrate(3-) (FIXTURE placeholder ChEBI ID)"
+        },
+        {
+          "role": "product",
+          "chebi_id": "CHEBI:990005",
+          "coefficient": 1,
+          "name": "CoA (FIXTURE placeholder ChEBI ID)"
+        },
+        {
+          "role": "product",
+          "chebi_id": "CHEBI:990006",
+          "coefficient": 1,
+          "name": "H+ (FIXTURE placeholder ChEBI ID)"
+        }
+      ]
+    },
+    {
+      "entry_id": "fixture-enzyme-pfk-paralog-a",
+      "entity_type": "enzyme",
+      "canonical_name": "phosphofructokinase paralog A (FIXTURE placeholder, EC 2.7.1.11)",
+      "identifiers": {
+        "model_native": [
+          {
+            "source": "model_native",
+            "id": "FIXLOCUS0001 (pfkA-like)",
+            "state": "present",
+            "method": "locus_tag_reuse",
+            "confidence": "low",
+            "source_version": "FIXTURE placeholder -- not a real project artifact",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "A genome locus tag reused as the nearest existing identifier. A locus tag is NOT itself a model-native reaction ID claim."
+          }
+        ],
+        "rhea": [
+          {
+            "source": "rhea",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "chebi": [
+          {
+            "source": "chebi",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "ec": [
+          {
+            "source": "ec",
+            "id": "2.7.1.11",
+            "state": "present",
+            "method": "ec_number_match",
+            "confidence": "low",
+            "source_version": "FIXTURE placeholder",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "Shared EC class only; NOT sufficient alone to prove which paralog is the model-relevant enzyme (many-to-many bridge)."
+          }
+        ],
+        "uniprot": [
+          {
+            "source": "uniprot",
+            "id": "P0FIX01",
+            "state": "present",
+            "method": "rest_api_lookup",
+            "confidence": "medium",
+            "source_version": "FIXTURE placeholder",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "Only a generic EC (2.7.1.11) annotation on file; not confirmed as the model-relevant paralog."
+          }
+        ],
+        "ncbi_taxonomy": [
+          {
+            "source": "ncbi_taxonomy",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "biocyc": [
+          {
+            "source": "biocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "cyanocyc": [
+          {
+            "source": "cyanocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "sabio_rk": [
+          {
+            "source": "sabio_rk",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "brenda_ligand": [
+          {
+            "source": "brenda_ligand",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "kegg": [
+          {
+            "source": "kegg",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "metanetx": [
+          {
+            "source": "metanetx",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ]
+      },
+      "ambiguity": {
+        "direction": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "protonation": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "compartment": {
+          "applies": true,
+          "state": "unknown",
+          "description": "Rhea/ChEBI reaction and compound definitions are compartment-agnostic (aqueous-phase only). Compartment is 'unknown' unless a project model artifact explicitly asserts a localization for this entity."
+        },
+        "generic_compound": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "isoenzyme": {
+          "applies": true,
+          "state": "unknown",
+          "description": "Two paralogous enzymes (this entry and fixture-enzyme-pfk-paralog-b) both carry the same generic EC 2.7.1.11 annotation. No in-scope source in this fixture resolves which paralog corresponds to which physiological activity; both are retained rather than guessed.\n",
+          "alternatives": [
+            "fixture-enzyme-pfk-paralog-b"
+          ]
+        }
+      },
+      "provenance": {
+        "retrieved_at": "2026-09-22T00:00:00Z",
+        "compiled_by": "biochemical-identifier-crosswalk skill fixture (synthetic, ambiguous isoenzyme)",
+        "upstream_tasks": [
+          "DX-40"
+        ]
+      },
+      "transformation_history": [
+        {
+          "timestamp": "2026-09-22T00:00:00Z",
+          "actor": "scripts/build_crosswalk.py",
+          "operation": "manual_curation",
+          "description": "Synthetic isoenzyme-ambiguity fixture; only identity evidence present is ec_number_match, which the builder must flag as identity-unconfirmed."
+        }
+      ],
+      "ec_number": "2.7.1.11"
+    },
+    {
+      "entry_id": "fixture-enzyme-pfk-paralog-b",
+      "entity_type": "enzyme",
+      "canonical_name": "phosphofructokinase paralog B (FIXTURE placeholder, EC 2.7.1.11)",
+      "identifiers": {
+        "model_native": [
+          {
+            "source": "model_native",
+            "id": "FIXLOCUS0002 (pfkB-like)",
+            "state": "present",
+            "method": "locus_tag_reuse",
+            "confidence": "low",
+            "source_version": "FIXTURE placeholder -- not a real project artifact",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "A genome locus tag reused as the nearest existing identifier. A locus tag is NOT itself a model-native reaction ID claim."
+          }
+        ],
+        "rhea": [
+          {
+            "source": "rhea",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "chebi": [
+          {
+            "source": "chebi",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "ec": [
+          {
+            "source": "ec",
+            "id": "2.7.1.11",
+            "state": "present",
+            "method": "ec_number_match",
+            "confidence": "low",
+            "source_version": "FIXTURE placeholder",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "Shared EC class only; NOT sufficient alone to prove which paralog is the model-relevant enzyme (many-to-many bridge)."
+          }
+        ],
+        "uniprot": [
+          {
+            "source": "uniprot",
+            "id": "P0FIX02",
+            "state": "present",
+            "method": "rest_api_lookup",
+            "confidence": "medium",
+            "source_version": "FIXTURE placeholder",
+            "evidence_ref": "fixtures/configs/synthetic-ambiguous-isoenzyme-pfk.yaml",
+            "retrieved_at": "2026-09-22T00:00:00Z",
+            "note": "Only a generic EC (2.7.1.11) annotation on file; not confirmed as the model-relevant paralog."
+          }
+        ],
+        "ncbi_taxonomy": [
+          {
+            "source": "ncbi_taxonomy",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "biocyc": [
+          {
+            "source": "biocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "cyanocyc": [
+          {
+            "source": "cyanocyc",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "sabio_rk": [
+          {
+            "source": "sabio_rk",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "brenda_ligand": [
+          {
+            "source": "brenda_ligand",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "kegg": [
+          {
+            "source": "kegg",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ],
+        "metanetx": [
+          {
+            "source": "metanetx",
+            "state": "unknown",
+            "method": "not_applicable",
+            "confidence": "not_applicable",
+            "note": "Not populated in the source config; no in-scope query targeted this namespace/entity combination."
+          }
+        ]
+      },
+      "ambiguity": {
+        "direction": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "protonation": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "compartment": {
+          "applies": true,
+          "state": "unknown",
+          "description": "Rhea/ChEBI reaction and compound definitions are compartment-agnostic (aqueous-phase only). Compartment is 'unknown' unless a project model artifact explicitly asserts a localization for this entity."
+        },
+        "generic_compound": {
+          "applies": false,
+          "state": "not_applicable"
+        },
+        "isoenzyme": {
+          "applies": true,
+          "state": "unknown",
+          "description": "Paralog of fixture-enzyme-pfk-paralog-a under the same generic EC class; unresolved for the same reason.\n",
+          "alternatives": [
+            "fixture-enzyme-pfk-paralog-a"
+          ]
+        }
+      },
+      "provenance": {
+        "retrieved_at": "2026-09-22T00:00:00Z",
+        "compiled_by": "biochemical-identifier-crosswalk skill fixture (synthetic, ambiguous isoenzyme)",
+        "upstream_tasks": [
+          "DX-40"
+        ]
+      },
+      "transformation_history": [
+        {
+          "timestamp": "2026-09-22T00:00:00Z",
+          "actor": "scripts/build_crosswalk.py",
+          "operation": "manual_curation",
+          "description": "Synthetic isoenzyme-ambiguity fixture; only identity evidence present is ec_number_match, which the builder must flag as identity-unconfirmed."
+        }
+      ],
+      "ec_number": "2.7.1.11"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/18_pathway_glycolysis.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:GLYCOLYSIS'>
+<Pathway ID='ECOLI:GLYCOLYSIS' orgid='ECOLI' frameid='GLYCOLYSIS' detail='full'>
+<common-name datatype='string'>glycolysis I (from glucose 6-phosphate)</common-name>
+</Pathway>
+</ptools-xml>

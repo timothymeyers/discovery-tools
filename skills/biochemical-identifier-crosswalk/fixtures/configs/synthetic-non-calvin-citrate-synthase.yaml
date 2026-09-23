@@ -1,0 +1,118 @@
+# SYNTHETIC FIXTURE -- not grounded evidence.
+#
+# Purpose: exercise the config-driven builder/validator on a non-Calvin-cycle
+# reaction (TCA cycle, citrate synthase-like: acetyl-CoA + oxaloacetate + H2O
+# -> citrate + CoA + H+), and demonstrate the currency-metabolite vs
+# generic-compound distinction (H2O/CoA/H+ are currency, not generic; nothing
+# here is chemically underspecified so generic_compound never applies).
+#
+# All identifiers below are deliberately out-of-range placeholders
+# (RHEA:9900x, CHEBI:9900xx) so this file can never be mistaken for a real
+# retrieved cross-reference. A real invocation of this skill MUST replace
+# every placeholder with an actual retrieved Rhea/ChEBI/UniProt value before
+# any conclusion is drawn from it.
+entries:
+  - entry_id: fixture-rxn-citrate-synthase
+    entity_type: reaction
+    canonical_name: "acetyl-CoA + oxaloacetate + H2O => citrate + CoA + H+ (TCA cycle, citrate synthase, EC 2.3.3.1)"
+    ec_number: "2.3.3.1"
+    direction_evidence:
+      resolved_from: equation_text
+      equation_text: "acetyl-CoA + oxaloacetate + H2O => citrate + CoA + H+ (as published in the placeholder Rhea LR entry's own equation text, not inferred from the LR suffix)"
+      biological_direction: forward
+      note: >
+        FIXTURE NOTE: illustrates that direction must be read from the
+        equation string itself. In this synthetic example the placeholder
+        Rhea LR ID happens to already match the biological (condensation)
+        direction -- unlike the real PGK/RuBisCO cases in DX-27, where LR
+        was the reverse of the biologically conventional direction. Do not
+        assume LR always matches; always check the retrieved equation text.
+    identifiers:
+      model_native:
+        - source: model_native
+          state: not_applicable
+          method: not_applicable
+          confidence: not_applicable
+          note: "No project model-native reaction ID exists for this fixture reaction."
+      rhea:
+        - source: rhea
+          id: "RHEA:990010"
+          state: present
+          method: bulk_export_lookup
+          confidence: high
+          source_version: "FIXTURE placeholder -- not a real Rhea release"
+          evidence_ref: "fixtures/configs/synthetic-non-calvin-citrate-synthase.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+          note: "Placeholder LR-direction ID for this synthetic fixture."
+      chebi:
+        - source: chebi
+          state: not_applicable
+          method: not_applicable
+          confidence: not_applicable
+          note: "Reaction-level entries carry participants in stoichiometry, not a single chebi mapping."
+      ec:
+        - source: ec
+          id: "2.3.3.1"
+          state: present
+          method: direct_xref_file
+          confidence: high
+          source_version: "FIXTURE placeholder"
+          evidence_ref: "fixtures/configs/synthetic-non-calvin-citrate-synthase.yaml"
+          retrieved_at: "2026-09-22T00:00:00Z"
+    ambiguity:
+      direction:
+        applies: false
+        state: not_applicable
+        description: "Only one biological direction is asserted by the placeholder equation text in this fixture."
+      protonation:
+        applies: true
+        state: present
+        description: "H+ participant is a distinct charge-state ChEBI entity from its conjugate base, per the usual ChEBI protonation-relation pattern; not collapsed."
+      generic_compound:
+        applies: false
+        state: not_applicable
+        description: "All participants are chemically fully specified (no R-groups/wildcards) in this fixture."
+      isoenzyme:
+        applies: false
+        state: not_applicable
+    compartment: unknown
+    stoichiometry:
+      - role: substrate
+        chebi_id: "CHEBI:990001"
+        coefficient: 1
+        name: "acetyl-CoA (FIXTURE placeholder ChEBI ID)"
+        role_class: currency
+      - role: substrate
+        chebi_id: "CHEBI:990002"
+        coefficient: 1
+        name: "oxaloacetate(2-) (FIXTURE placeholder ChEBI ID)"
+        role_class: specific
+      - role: substrate
+        chebi_id: "CHEBI:990003"
+        coefficient: 1
+        name: "H2O (FIXTURE placeholder ChEBI ID)"
+        role_class: currency
+      - role: product
+        chebi_id: "CHEBI:990004"
+        coefficient: 1
+        name: "citrate(3-) (FIXTURE placeholder ChEBI ID)"
+        role_class: specific
+      - role: product
+        chebi_id: "CHEBI:990005"
+        coefficient: 1
+        name: "CoA (FIXTURE placeholder ChEBI ID)"
+        role_class: currency
+      - role: product
+        chebi_id: "CHEBI:990006"
+        coefficient: 1
+        name: "H+ (FIXTURE placeholder ChEBI ID)"
+        role_class: currency
+    provenance:
+      retrieved_at: "2026-09-22T00:00:00Z"
+      compiled_by: "biochemical-identifier-crosswalk skill fixture (synthetic, non-Calvin-cycle)"
+      upstream_tasks: ["DX-40"]
+    transformation_history:
+      - timestamp: "2026-09-22T00:00:00Z"
+        actor: "scripts/build_crosswalk.py"
+        operation: "manual_curation"
+        description: "Synthetic fixture authored to exercise a non-Calvin-cycle reaction path (currency-metabolite-heavy TCA reaction) through the config-driven builder/validator."

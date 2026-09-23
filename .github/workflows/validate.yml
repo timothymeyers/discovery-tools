@@ -35,19 +35,62 @@ jobs:
             (cd "$(dirname "$(dirname "$b")")" && python3 scripts/build.py --check)
           done
 
+      - name: Install per-skill dependencies
+        run: |
+          python3 -m pip install --quiet --upgrade pip
+          python3 -m pip install --quiet -r requirements-dev.txt
+          # Runtime deps are per-skill, not one global blob: a skill must be
+          # installable and usable on its own.
+          for r in skills/*/requirements.txt; do
+            [ -f "$r" ] || continue
+            echo "installing $r"
+            python3 -m pip install --quiet -r "$r"
+          done
+
       - name: Run skill test suites
         run: |
+          ran=0
+          # unittest suites live beside the code in scripts/
           for t in skills/*/scripts/test_*.py; do
             [ -f "$t" ] || continue
-            echo "running $t"
-            (cd "$(dirname "$(dirname "$t")")" \
-              && python3 -m unittest discover -s scripts -p "$(basename "$t")")
+            skill="$(dirname "$(dirname "$t")")"
+            echo "::group::unittest $t"
+            (cd "$skill" && python3 -m unittest discover -s scripts -p "$(basename "$t")")
+            echo "::endgroup::"
+            ran=$((ran + 1))
           done
+          # pytest suites live in tests/ with their own conftest.py
+          for d in skills/*/tests; do
+            [ -d "$d" ] || continue
+            skill="$(dirname "$d")"
+            echo "::group::pytest $skill"
+            # A glob that matches nothing still "passes", and so does a suite
+            # that silently collects zero tests. Fail loudly on both.
+            (cd "$skill" && python3 -m pytest tests -q) || exit 1
+            collected=$(cd "$skill" && python3 -m pytest tests --collect-only -q 2>/dev/null \
+                          | tail -1 | grep -oE '^[0-9]+' || echo 0)
+            if [ "${collected:-0}" -eq 0 ]; then
+              echo "::error::$skill declares tests/ but collected 0 tests"
+              exit 1
+            fi
+            echo "$skill: $collected tests"
+            echo "::endgroup::"
+            ran=$((ran + 1))
+          done
+          if [ "$ran" -eq 0 ]; then
+            echo "::error::no skill test suites were discovered"
+            exit 1
+          fi
+          echo "ran $ran skill test suite(s)"
 
       - name: Assert no generated artifacts are tracked
         run: |
           if git ls-files | grep -E 'token_usage_mined\.json|token-usage-report.*\.md'; then
             echo "::error::generated artifact is tracked in git"
+            exit 1
+          fi
+          if git ls-files | grep -E '(^|/)(\.pytest_cache|__pycache__|\.ruff_cache|\.mypy_cache)/'; then
+            echo "::error::generated cache directory is tracked in git"
             exit 1
           fi
           echo "no generated artifacts tracked"

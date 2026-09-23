@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/11_monomer_pfkA.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:6PFK-1-MONOMER'>
+<Protein ID='ECOLI:6PFK-1-MONOMER' orgid='ECOLI' frameid='6PFK-1-MONOMER' detail='full'>
+<common-name datatype='string'>6-phosphofructokinase 1</common-name>
+<gene><Gene resource='getxml?ECOLI:EG10699' orgid='ECOLI' frameid='EG10699'/></gene>
+</Protein>
+</ptools-xml>

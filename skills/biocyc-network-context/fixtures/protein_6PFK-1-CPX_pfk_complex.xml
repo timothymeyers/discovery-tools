@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/06_enzyme_pfkA.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:6PFK-1-CPX'>
+<Protein ID='ECOLI:6PFK-1-CPX' orgid='ECOLI' frameid='6PFK-1-CPX' detail='full'>
+<common-name datatype='string'>6-phosphofructokinase 1</common-name>
+<component><Protein resource='getxml?ECOLI:6PFK-1-MONOMER' orgid='ECOLI' frameid='6PFK-1-MONOMER'/><coefficient datatype='integer'>4</coefficient>
+</component>
+</Protein>
+</ptools-xml>

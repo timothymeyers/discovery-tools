@@ -1,11 +1,12 @@
 ---
 name: build-research-paper
 description: |
-  Build beautifully-formatted, arxiv-ready research paper PDFs from a mix of
-  hand-authored LaTeX and/or markdown + PNG figures, using `tectonic` (default)
-  or `pandoc` (escape hatch). Captures the reusable pattern that research
-  projects keep re-discovering: `report/main.tex` + `references.bib` +
-  `generate_figures.py` + iterative feedback/response scaffolding, all
+  Cross-domain / Scientific writing and publication — Build
+  beautifully-formatted, arxiv-ready research paper PDFs from a mix of
+  hand-authored LaTeX and/or markdown + PNG figures, using `tectonic`
+  (default) or `pandoc` (escape hatch). Captures the reusable pattern that
+  research projects keep re-discovering: `report/main.tex` + `references.bib`
+  + `generate_figures.py` + iterative feedback/response scaffolding, all
   buildable with a single command. WHEN: write a research paper, arxiv
   submission, prepub, generate PDF from markdown, LaTeX paper, build main.tex,
   journal manuscript, referee revision, response to referee, resubmission
@@ -13,6 +14,8 @@ description: |
   build, pandoc build, generate arxiv-ready PDF, bibliography from BibTeX.
 metadata:
   version: "2"
+  category: "Cross-domain"
+  subfield: "Scientific writing and publication"
 ---
 
 # build-research-paper — Research Paper Builder Skill

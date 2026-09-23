@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/08_enzyme_zwf.xml (DX-53).
+     Only the top-level Protein element and its direct dblinks/gene link are
+     retained; the full response also carries many unrelated post
+     translational modification Feature sub-records, dropped here to keep
+     this fixture small. -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:GLU6PDEHYDROG-MONOMER'>
+<Protein ID='ECOLI:GLU6PDEHYDROG-MONOMER' orgid='ECOLI' frameid='GLU6PDEHYDROG-MONOMER' detail='full'>
+<common-name datatype='string'>NADP+-dependent glucose-6-phosphate dehydrogenase</common-name>
+<gene><Gene resource='getxml?ECOLI:EG11221' orgid='ECOLI' frameid='EG11221'/></gene>
+<dblink><dblink-db>UNIPROT</dblink-db>
+<dblink-oid>P0AC53</dblink-oid>
+<dblink-relationship>unification</dblink-relationship>
+</dblink>
+<dblink><dblink-db>REFSEQ</dblink-db>
+<dblink-oid>NP_416366</dblink-oid>
+<dblink-relationship>unification</dblink-relationship>
+</dblink>
+</Protein>
+</ptools-xml>

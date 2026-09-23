@@ -1,0 +1,26 @@
+{
+  "_fixture_note": "Exact historical regression fixture for the Cyanobacteria/Cyanobacteriota name-drift bug: entry 301's own lineage array uses the *current* NCBI phylum name 'Cyanobacteriota' (never the retired 'Cyanobacteria' string a literal-name filter searched for), with fallback taxid 1117 resolvable only via taxid ancestry (see companion fixture cyanobacteria_name_drift_regression_efetch.xml). Entry 302 has an empty lineage array and must classify as unknown_empty_lineage, never a match, regardless of what its taxid ancestry would otherwise resolve to.",
+  "meta": {"page": 1, "page_size": 100, "total_count": 2, "total_pages": 1},
+  "data": [
+    {
+      "id": 301,
+      "general": {
+        "organism": {"id": 301, "name": "Synechocystis sp.", "ncbi_taxonomy_id": 1148, "ncbi_taxonomy_lineage": ["Bacteria", "Cyanobacteriota", "Synechococcales"]},
+        "strain": {"id": null, "name": null},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [{"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 0.9, "unit": {"name": "mM"}}]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    },
+    {
+      "id": 302,
+      "general": {
+        "organism": {"id": 302, "name": "Unclassified bacterium", "ncbi_taxonomy_id": 90372, "ncbi_taxonomy_lineage": []},
+        "strain": {"id": null, "name": null},
+        "experiment_type": "InVitro"
+      },
+      "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": [{"name": "Km", "parameter_type": {"name": "Km"}, "start_value": 1.5, "unit": {"name": "mM"}}]},
+      "enzyme_description": {"ec_number": "1.1.1.1"}
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/14_gene_g7463.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:G7463'><metadata><PGDB orgid='ECOLI' version='30.0'><dblink><dblink-db>NCBI-TAXONOMY-DB</dblink-db><dblink-oid>511145</dblink-oid></dblink></PGDB></metadata>
+<Gene ID='ECOLI:G7463' orgid='ECOLI' frameid='G7463' detail='full'>
+<common-name datatype='string'>kduI</common-name>
+<accession-1 datatype='string'>b2843</accession-1>
+<left-end-position datatype='integer'>2983288</left-end-position>
+<right-end-position datatype='integer'>2984124</right-end-position>
+<transcription-direction datatype='string'>-</transcription-direction>
+</Gene>
+</ptools-xml>

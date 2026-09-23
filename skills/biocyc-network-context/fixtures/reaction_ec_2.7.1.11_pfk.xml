@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!-- Trimmed from docs/database-evidence/second-organism/raw/biocyc/02_reaction_pfk.xml (DX-53). -->
+<ptools-xml ptools-version='30.0' xml:base='http://BioCyc.org/getxml?ECOLI:6PFRUCTPHOS-RXN'><metadata><PGDB orgid='ECOLI' version='30.0'><species datatype='string'>Escherichia coli</species><strain datatype='string'>K-12 substr. MG1655</strain><dblink><dblink-db>NCBI-TAXONOMY-DB</dblink-db><dblink-oid>511145</dblink-oid></dblink></PGDB></metadata>
+<Reaction ID='ECOLI:6PFRUCTPHOS-RXN' orgid='ECOLI' frameid='6PFRUCTPHOS-RXN' detail='full'>
+<ec-number>EC-2.7.1.11<official>T</official>
+</ec-number>
+<in-pathway><Pathway resource='getxml?ECOLI:GLYCOLYSIS' orgid='ECOLI' frameid='GLYCOLYSIS'/><Pathway resource='getxml?ECOLI:PWY-5484' orgid='ECOLI' frameid='PWY-5484'/></in-pathway>
+<physiologically-relevant datatype='boolean'>true</physiologically-relevant>
+<enzymatic-reaction><Enzymatic-Reaction ID='ECOLI:6PFRUCTPHOS-ENZRXN' orgid='ECOLI' frameid='6PFRUCTPHOS-ENZRXN' detail='low'><enzyme><Protein resource='getxml?ECOLI:6PFK-1-CPX' orgid='ECOLI' frameid='6PFK-1-CPX'/></enzyme>
+<common-name datatype='string'>6-phosphofructokinase</common-name>
+</Enzymatic-Reaction>
+<Enzymatic-Reaction ID='ECOLI:PFRUCTPHOS-ENZRXN' orgid='ECOLI' frameid='PFRUCTPHOS-ENZRXN' detail='low'><enzyme><Protein resource='getxml?ECOLI:6PFK-2-CPX' orgid='ECOLI' frameid='6PFK-2-CPX'/></enzyme>
+<common-name datatype='string'>6-phosphofructokinase</common-name>
+</Enzymatic-Reaction>
+</enzymatic-reaction>
+<reaction-direction>LEFT-TO-RIGHT</reaction-direction>
+<left><Compound resource='getxml?ECOLI:FRUCTOSE-6P' orgid='ECOLI' frameid='FRUCTOSE-6P'/></left>
+<left><Compound resource='getxml?ECOLI:ATP' orgid='ECOLI' frameid='ATP'/></left>
+<right><Compound resource='getxml?ECOLI:ADP' orgid='ECOLI' frameid='ADP'/></right>
+<right><Compound resource='getxml?ECOLI:FRUCTOSE-16-DIPHOSPHATE' orgid='ECOLI' frameid='FRUCTOSE-16-DIPHOSPHATE'/></right>
+</Reaction>
+</ptools-xml>

@@ -5,14 +5,14 @@
     "url": "https://github.com/timothymeyers"
   },
   "metadata": {
-    "description": "Agents, skills, and starter kits for Microsoft Discovery (AI for Science)",
-    "version": "0.5.0"
+    "description": "Agents, skills, and starter kits for Microsoft Discovery (AI for Science), categorized by scientific domain",
+    "version": "0.6.0"
   },
   "plugins": [
     {
       "name": "discovery-tools",
-      "description": "Agents, skills, and starter kits for Microsoft Discovery \u2014 the AI for Science platform. Covers Discovery agent deployment and investigation task design, workspace token-usage mining, live project status dashboards, arxiv-ready paper builds, and DOE literature retrieval.",
-      "version": "0.5.0",
+      "description": "Agents, skills, and starter kits for Microsoft Discovery \u2014 the AI for Science platform. Life-sciences data skills for SABIO-RK, BRENDA, BioCyc/EcoCyc/CyanoCyc, AlphaFold DB, and Rhea/ChEBI/MetaNetX/UniProt identifier crosswalks, plus cross-domain skills for scientific database access, evidence QC, Discovery agent deployment and task design, workspace token-usage mining, live project dashboards, arxiv-ready paper builds, and DOE literature retrieval. Every skill declares its scientific category and subfield.",
+      "version": "0.6.0",
       "author": {
         "name": "Tim Meyers",
         "url": "https://github.com/timothymeyers"
@@ -41,7 +41,27 @@
         "observability-dashboard",
         "project-status",
         "engine-liveness",
-        "clio"
+        "clio",
+        "life-sciences",
+        "enzymology",
+        "systems-biology",
+        "structural-biology",
+        "bioinformatics",
+        "cheminformatics",
+        "sabio-rk",
+        "brenda",
+        "biocyc",
+        "alphafold",
+        "uniprot",
+        "chebi",
+        "rhea",
+        "metanetx",
+        "kinetics",
+        "metabolic-networks",
+        "identifier-crosswalk",
+        "data-provenance",
+        "reproducibility",
+        "scientific-databases"
       ],
       "source": {
         "source": "github",

@@ -1,0 +1,5 @@
+{
+  "_fixture_note": "Synthetic transport-failure fixture: represents a connection-level failure (e.g. DNS/connect timeout) rather than any HTTP status code at all. In tests, the injected http_get raises/returns a sentinel None-status response for this scenario; classified as outcome=failure, failure_kind=transport.",
+  "http_status": null,
+  "simulated_exception": "ConnectionError: could not connect to host"
+}

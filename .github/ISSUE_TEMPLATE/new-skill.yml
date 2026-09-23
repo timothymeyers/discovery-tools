@@ -12,11 +12,50 @@ body:
     validations:
       required: true
 
+  - type: dropdown
+    id: category
+    attributes:
+      label: Primary scientific category
+      description: >
+        Controlled vocabulary. This goes in `metadata.category` AND must lead the
+        description as a cue, e.g. "Life sciences / Enzymology — ...". Use
+        Cross-domain for skills that work regardless of scientific domain.
+      options:
+        - Life sciences
+        - Physical sciences
+        - Earth and environmental sciences
+        - Engineering and materials
+        - Computer and information sciences
+        - Mathematics and statistics
+        - Cross-domain
+    validations:
+      required: true
+
+  - type: input
+    id: subfield
+    attributes:
+      label: Subfield
+      description: Free text. Goes in `metadata.subfield` and after the slash in the description cue.
+      placeholder: Enzymology / biochemical kinetics
+    validations:
+      required: true
+
+  - type: input
+    id: secondary
+    attributes:
+      label: Also relevant to (optional)
+      description: A genuine second audience, if there is one. Goes in `metadata.secondary`.
+      placeholder: Physical sciences (chemical kinetics)
+
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: What it does and WHEN it should trigger. Max 1024 chars — this is what `gh skill search` indexes.
+      description: >
+        What it does and WHEN it should trigger. Max 1024 chars — this is what
+        `gh skill search` indexes and the only thing besides `name` that agents load
+        at startup. Must lead with the "Category / Subfield — " cue.
+      placeholder: 'Life sciences / Enzymology — Parameterized SABIO-RK kinetic-law ingestion. ... WHEN: "query SABIO-RK", ...'
     validations:
       required: true
 
@@ -37,3 +76,6 @@ body:
         - label: Writes generated output to the CWD, never into its own install directory
         - label: Emits no secrets, personal paths, or customer-identifying data
         - label: Does not pre-approve tools via `allowed-tools`
+        - label: Third-party runtime dependencies (if any) are in `requirements.txt` AND documented in a `## Dependencies` section
+        - label: Tests (if any) are offline — HTTP is injected from `fixtures/`, never a live network call
+        - label: No `.pytest_cache/`, `__pycache__/`, or other generated directories committed

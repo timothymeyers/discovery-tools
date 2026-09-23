@@ -1,0 +1,10 @@
+{
+  "compounds": {
+    "CHEBI:990001": {"formula": "C23H38N7O17P3S", "charge": -4},
+    "CHEBI:990002": {"formula": "C4H2O5", "charge": -2},
+    "CHEBI:990003": {"formula": "H2O", "charge": 0},
+    "CHEBI:990004": {"formula": "C6H5O7", "charge": -3},
+    "CHEBI:990005": {"formula": "C21H36N7O16P3S", "charge": -4},
+    "CHEBI:990006": {"formula": "H", "charge": 1}
+  }
+}

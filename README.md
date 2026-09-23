@@ -19,14 +19,32 @@ component layout. No symlinks, no duplication, no build step.
 
 ### Skills
 
-| Skill | Version | What it does |
-|---|---|---|
-| [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines (Clio / Science Engine, copilot-cli / Mission Control), models, and interactive chat. Handles seven known data-quality traps. Cost reporting is a deliberate opt-in feature flag. |
-| [`build-research-paper`](skills/build-research-paper) | 2 | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures, using `tectonic` (default) or `pandoc` (escape hatch). Ships templates, a scaffolder, build and check scripts, and referee-revision scaffolding. |
-| [`discovery-add-agents`](skills/discovery-add-agents) | 1.16.0 | Adds agents from the public `microsoft/discovery` repo to a workspace, then deploys each to one target: the local Copilot app as `.agent.md` companions, a Microsoft Discovery project + Azure via `UpsertAgent`, or promoting an already-local agent up to Discovery. |
-| [`discovery-design-tasks`](skills/discovery-design-tasks) | 1 | Generates a Microsoft Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
-| [`osti-literature-search`](skills/osti-literature-search) | 1 | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
-| [`discovery-dashboard`](skills/discovery-dashboard) | 1 | Read-only live operations dashboard for a Discovery workspace: leaf-task progress with approved vs awaiting-review kept separate, the executing/ready/blocked work front, engine liveness verified against real process identity, agent runs deduplicated via an alias graph, observed CLIO investigations, and an explicit coverage panel. Never writes to the workspace. |
+Every skill declares a scientific **category** and **subfield**, both in its
+`metadata:` block and as a leading cue in its `description`, so installing users
+and agents can tell at a glance whether it is relevant to their domain.
+
+#### Life sciences
+
+| Skill | Ver | Subfield | Also relevant to | What it does |
+|---|---|---|---|---|
+| [`alphafold-structure-provenance`](skills/alphafold-structure-provenance) | 1 | Structural and computational biology | Biophysics (diffusion values computed from structures) | Taxon-scoped UniProt lookup plus version-aware AlphaFold DB retrieval. Keeps pLDDT/PAE triage separate from assembly flags and records which structure version a derived quantity came from. |
+| [`biochemical-identifier-crosswalk`](skills/biochemical-identifier-crosswalk) | 1 | Biochemistry / bioinformatics | Chemistry (formula, charge and mass balance checks) | Reconciles reactions, compounds, proteins, and taxa across Rhea, ChEBI, MetaNetX, and UniProt without collapsing ambiguity. Verifies mass and charge balance. |
+| [`biocyc-network-context`](skills/biocyc-network-context) | 1 | Systems biology / metabolic networks | Genomics (gene-reaction links) | Bounded BioCyc/EcoCyc/CyanoCyc traversal: reaction → enzyme/complex → gene → pathway. Preserves isoenzymes, expands complexes, distinguishes a missing frame from a gated one. |
+| [`brenda-enzyme-data`](skills/brenda-enzyme-data) | 1 | Enzymology | — | Extracts and canonicalizes enzyme kinetics from a **caller-supplied licensed** BRENDA bulk JSON. Never bundles, downloads, or accepts the license for any dump. |
+| [`sabio-rk-kinetics`](skills/sabio-rk-kinetics) | 1 | Enzymology / biochemical kinetics | Physical sciences (chemical kinetics) | Ingests SABIO-RK kinetic laws with organism/genus/EC query tiering and taxid-ancestry fallback. Never conflates a confirmed-empty result with a transport or auth failure. |
+
+#### Cross-domain
+
+| Skill | Ver | Subfield | Also relevant to | What it does |
+|---|---|---|---|---|
+| [`build-research-paper`](skills/build-research-paper) | 2 | Scientific writing and publication | — | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures via `tectonic` or `pandoc`. Ships templates, a scaffolder, and referee-revision scaffolding. |
+| [`discovery-add-agents`](skills/discovery-add-agents) | 1.16.0 | Research platform engineering | — | Adds agents from the public `microsoft/discovery` repo, then deploys to one target: local Copilot `.agent.md` companions, a Discovery project + Azure, or promoting a local agent up. |
+| [`discovery-dashboard`](skills/discovery-dashboard) | 1 | Research platform observability | — | Read-only live operations dashboard for a Discovery workspace: progress, work front, engine liveness, agent runs, CLIO investigations, and an explicit coverage panel. |
+| [`discovery-design-tasks`](skills/discovery-design-tasks) | 1 | Research methodology and experiment design | — | Generates a Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
+| [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Research platform observability | — | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines, models, and interactive chat. Handles seven known data-quality traps. Cost reporting is opt-in. |
+| [`osti-literature-search`](skills/osti-literature-search) | 1 | Scientific literature retrieval | — | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
+| [`scientific-database-access`](skills/scientific-database-access) | 1 | Research data access and provenance | Life sciences (current source cards are bio databases) | Establishes a working, authorized, versioned route to a scientific database **before** declaring it inaccessible. Use before writing an adapter or designing a fallback. |
+| [`scientific-evidence-qc`](skills/scientific-evidence-qc) | 1 | Data quality and reproducibility | Life sciences (examples use reaction evidence) | Auditable append-only observation layer and coverage/QC reporting over merged scientific evidence. Use before trusting an existing "N/N passed" QC summary. |
 
 ### External tools
 

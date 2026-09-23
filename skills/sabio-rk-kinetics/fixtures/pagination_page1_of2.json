@@ -1,0 +1,7 @@
+{
+  "_fixture_note": "Synthetic pagination fixture, page 1 of 2 (total_count=150, page_size=100). Used to test that fetch_tier_entries follows total_pages and reports truncation honestly in sample mode.",
+  "meta": {"page": 1, "page_size": 100, "total_count": 150, "total_pages": 2},
+  "data": [
+    {"id": 1, "general": {"organism": {"id": 1, "name": "Escherichia coli", "ncbi_taxonomy_id": 562, "ncbi_taxonomy_lineage": ["Bacteria"]}}, "kineticlaw": {"formula": "kcat*A/(Km+A)", "parameter": []}, "enzyme_description": {"ec_number": "1.1.1.1"}}
+  ]
+}
