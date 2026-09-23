@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import sys
 import tempfile
 import unittest
@@ -349,53 +350,145 @@ class AgentCollectionTests(TempWorkspaceCase):
 # --------------------------------------------------------------------------
 
 class ClioTests(TempWorkspaceCase):
-    def _run_with(self, contents):
-        self.ws.engine_run(
-            "mission-control", "i1",
-            {"instanceId": "i1", "definitionId": "mission-control",
-             "completedAt": "2026-09-20T16:49:02+00:00"},
-            events=[{"kind": "ActionProposed", "content": c,
-                     "timestamp": "2026-09-20T04:00:00+00:00"} for c in contents],
-        )
-        return self.ws.collect()["clio"]
+    """Investigations, not tool-call tallies.
 
-    def test_counts_clio_verbs(self):
-        clio = self._run_with(["**clio-start**\n```json\n{}\n```",
-                               "**clio-wait**\n```json\n{}\n```"])
-        self.assertEqual(clio["observedTotal"], 2)
+    A clio-wait tally measures polling frequency, so the dashboard reports the
+    set of investigations and their state instead.
+    """
 
-    def test_ignores_path_fragments_that_merely_contain_clio(self):
-        """clio-plugin and clio-stderr are paths, not tool calls."""
-        clio = self._run_with([
-            "**Viewing ...dist/clio-plugin/plugins/clio/x.js**",
-            "**Running: cat clio-stderr.log**",
-        ])
-        self.assertEqual(clio["observedTotal"], 0)
+    def setUp(self):
+        super().setUp()
+        self._store = tempfile.TemporaryDirectory()
+        os.environ["COPILOT_SCIENCE_RUNS"] = self._store.name
 
-    def test_applied_events_do_not_double_count_proposals(self):
+    def tearDown(self):
+        os.environ.pop("COPILOT_SCIENCE_RUNS", None)
+        self._store.cleanup()
+        super().tearDown()
+
+    def _science_run(self, run_id, **over):
+        record = {
+            "run_id": run_id, "parent_run_id": None, "depth": 0, "state": "done",
+            "goal": "Repository: %s\n\nContext: do the thing." % self.ws.root,
+            "started": "2026-09-23 14:34:14Z", "updated": "2026-09-23 14:40:00Z",
+            "steers": 0, "last_tool": "task_complete", "tool_calls": 17,
+            "subagents": 0, "last_activity": "done: complete", "pid": None,
+        }
+        record.update(over)
+        write(pathlib.Path(self._store.name) / ("%s.json" % run_id), record)
+        return record
+
+    def _engine_calls(self, contents):
         self.ws.engine_run(
             "mission-control", "i1",
             {"instanceId": "i1", "definitionId": "mission-control"},
-            events=[
-                {"kind": "ActionProposed", "content": "**clio-start**"},
-                {"kind": "ActionApplied", "content": "**clio-start**"},
-            ],
+            events=[{"kind": "ActionProposed", "content": c,
+                     "timestamp": "2026-09-20T04:00:00+00:00"} for c in contents],
         )
-        self.assertEqual(self.ws.collect()["clio"]["observedTotal"], 1)
 
-    def test_investigation_lifecycle_is_tracked(self):
-        clio = self._run_with(["**clio-start**", "**clio-start**", "**clio-stop**"])
-        self.assertEqual(clio["investigationsOpened"], 2)
-        self.assertEqual(clio["investigationsClosed"], 1)
-        self.assertEqual(clio["investigationsOutstanding"], 1)
+    def test_tool_call_tallies_are_not_surfaced(self):
+        """The whole point: clio-wait counts are noise, not progress."""
+        self._engine_calls(['**clio-wait**\n```json\n{"rawInput":{"run_id":"aaaa1111"}}\n```'] * 67)
+        self._science_run("aaaa1111")
+        clio = self.ws.collect()["clio"]
+        self.assertNotIn("observedToolCalls", clio)
+        self.assertNotIn("observedTotal", clio)
+        self.assertEqual(clio["counts"]["total"], 1)
 
-    def test_outstanding_never_goes_negative(self):
-        clio = self._run_with(["**clio-archive**", "**clio-stop**"])
-        self.assertEqual(clio["investigationsOutstanding"], 0)
+    def test_states_are_counted(self):
+        self._science_run("aaaa1111", state="running", pid=None)
+        self._science_run("bbbb2222", state="done")
+        self._science_run("cccc3333", state="stopped")
+        counts = self.ws.collect()["clio"]["counts"]
+        self.assertEqual(counts["total"], 3)
+        self.assertEqual((counts["running"], counts["done"], counts["stopped"]), (1, 1, 1))
+
+    def test_runs_from_other_workspaces_are_excluded(self):
+        """The run store is machine-wide and shared by every project."""
+        self._science_run("a11ce001")
+        self._science_run("b0b5e002", goal="Repository: /somewhere/else\n\nContext: x.")
+        clio = self.ws.collect()["clio"]
+        self.assertEqual([r["runId"] for r in clio["investigations"]], ["a11ce001"])
+
+    def test_run_referenced_only_in_exhaust_is_admitted(self):
+        """Scoped by this workspace's own logs even if the goal says nothing."""
+        self._engine_calls(['**clio-wait**\n```json\n{"rawInput":{"run_id":"e5ca9a51"}}\n```'])
+        self._science_run("e5ca9a51", goal="Repository: /elsewhere\n\nContext: x.")
+        clio = self.ws.collect()["clio"]
+        self.assertEqual([r["runId"] for r in clio["investigations"]], ["e5ca9a51"])
+        self.assertEqual(clio["investigations"][0]["scopedBy"], "exhaust")
+
+    def test_running_run_with_dead_process_is_flagged_not_rewritten(self):
+        self._science_run("aaaa1111", state="running", pid=999999)
+        run = self.ws.collect()["clio"]["investigations"][0]
+        self.assertEqual(run["state"], "running")  # the store's own account
+        self.assertTrue(run["processMissing"])
+
+    def test_progress_fields_are_carried(self):
+        self._science_run("aaaa1111", tool_calls=17, steers=2, subagents=3,
+                          last_activity="done: complete")
+        run = self.ws.collect()["clio"]["investigations"][0]
+        self.assertEqual((run["toolCalls"], run["steers"], run["subagents"]), (17, 2, 3))
+        self.assertEqual(run["lastActivity"], "done: complete")
+
+    def test_subagent_runs_are_related_to_their_parent(self):
+        self._science_run("9a9e0001")
+        self._science_run("c41d0002", parent_run_id="9a9e0001", depth=1)
+        runs = {r["runId"]: r for r in self.ws.collect()["clio"]["investigations"]}
+        self.assertEqual(runs["c41d0002"]["parentRunId"], "9a9e0001")
+        self.assertEqual(self.ws.collect()["clio"]["counts"]["subagentRuns"], 1)
+
+    def test_goal_boilerplate_is_stripped_for_display(self):
+        """The Repository: header is scoping metadata, not a description."""
+        self._science_run("aaaa1111",
+                          goal="Repository: %s\n\nRun the broad screening sweep."
+                               % self.ws.root)
+        self.assertEqual(self.ws.collect()["clio"]["investigations"][0]["goal"],
+                         "Run the broad screening sweep.")
+
+    def test_goal_prefix_on_the_same_line_is_stripped_not_dropped(self):
+        """The header is often the start of the same sentence as the goal.
+
+        Skipping the whole line would discard the only description there is.
+        """
+        self._science_run(
+            "aaaa1111",
+            goal="Repository: %s (git repo a/b). This is DX-136, the final leaf."
+                 % self.ws.root)
+        self.assertEqual(self.ws.collect()["clio"]["investigations"][0]["goal"],
+                         "This is DX-136, the final leaf.")
+
+    def test_last_activity_is_never_used_as_the_goal(self):
+        """'done: Path does not exist' is a status line, not a description."""
+        self._science_run("aaaa1111", goal="Repository: %s" % self.ws.root,
+                          last_activity="done: Path does not exist")
+        run = self.ws.collect()["clio"]["investigations"][0]
+        self.assertIsNone(run["goal"])
+        self.assertEqual(run["lastActivity"], "done: Path does not exist")
+
+    def test_run_timestamps_are_normalised_to_iso(self):
+        self._science_run("aaaa1111", started="2026-09-23 14:34:14Z")
+        run = self.ws.collect()["clio"]["investigations"][0]
+        self.assertEqual(run["startedAt"], "2026-09-23T14:34:14+00:00")
+
+    def test_missing_run_store_is_reported_not_fatal(self):
+        os.environ["COPILOT_SCIENCE_RUNS"] = os.path.join(self._store.name, "nope")
+        snap = self.ws.collect()
+        self.assertEqual(snap["clio"]["counts"]["total"], 0)
+        states = {c["source"]: c["state"] for c in snap["coverage"]["entries"]}
+        self.assertEqual(states["clio.runs"], "missing")
+
+    def test_path_fragments_are_not_mistaken_for_calls(self):
+        """clio-plugin and clio-stderr are paths, not tool calls."""
+        self._engine_calls([
+            "**Viewing ...dist/clio-plugin/plugins/clio/x.js**",
+            "**Running: cat clio-stderr.log**",
+        ])
+        self.assertEqual(self.ws.collect()["clio"]["verbsObserved"], [])
 
     def test_caveat_is_always_present(self):
-        clio = self._run_with(["**clio-start**"])
-        self.assertIn("does not mean CLIO was never used", clio["caveat"])
+        self._science_run("aaaa1111")
+        self.assertIn("zero is not proof", self.ws.collect()["clio"]["caveat"])
 
 
 # --------------------------------------------------------------------------
@@ -558,6 +651,32 @@ class BookshelfTests(TempWorkspaceCase):
             ],
         })
         self.assertEqual(self.ws.collect()["bookshelf"]["failed"], 1)
+
+    def test_shelves_json_layout_counts_provider_documents(self):
+        # 0.15.15: no ingest-state.json; shelves.json + provider stores.
+        root = self.ws.discovery / "bookshelf"
+        write(root / "shelves.json", {"shelves": [
+            {"shelfId": "s1", "name": "lit",
+             "providerConfigs": [{"providerId": "graphrag-zero"}]},
+            {"shelfId": "s2", "name": "memory-mc",
+             "providerConfigs": [{"providerId": "graphrag-zero",
+                                  "metadata": {"kind": "engine-memory"}}]},
+        ]})
+        store = root / "providers" / "graphrag-zero"
+        for i in range(3):
+            write(store / "s1" / "documents" / ("d%d.meta.json" % i),
+                  {"title": "paper %d" % i, "sourceRef": "knowledge/p%d.pdf" % i})
+        write(store / "s1" / "index" / "index-meta.json",
+              {"documentCount": 2, "lastIndexedAt": "2026-09-23T14:26:15.160Z"})
+        shelf = self.ws.collect()["bookshelf"]
+        by_name = {s["name"]: s for s in shelf["shelves"]}
+        self.assertEqual(shelf["documents"], 3)
+        self.assertEqual(by_name["lit"]["documentsOnDisk"], 3)
+        # On-disk and indexer counts stay separate.
+        self.assertEqual(by_name["lit"]["indexedDocuments"], 2)
+        self.assertEqual(by_name["memory-mc"]["kind"], "engine-memory")
+        self.assertEqual(by_name["memory-mc"]["documentsOnDisk"], 0)
+        self.assertIsNone(by_name["memory-mc"]["indexedDocuments"])
 
 
 # --------------------------------------------------------------------------

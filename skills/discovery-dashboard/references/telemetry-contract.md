@@ -121,26 +121,39 @@ Related rules:
 
 ## CLIO
 
-Detected two ways: a `pluginDirectory` pointing at a clio plugin, and observed
-structured tool calls.
+Reported as **investigations**, not tool-call tallies. A `clio-wait` count
+measures how often a wait loop polled; it says nothing about what the
+investigation did, and a run that polled 67 times is not more productive than
+one that polled 3 times. Call counts are therefore collected only to discover
+which run ids belong to this workspace, and are never surfaced.
 
-In engine exhaust CLIO surfaces as **`clio-<verb>`**, not under its MCP tool id.
-Known verbs: `start`, `stop`, `run`, `wait`, `status`, `steer`, `mode`,
-`archive`, `disposition`, `investigate`. The verb set is an allowlist because a
-bare `clio-\w+` match also catches path fragments like `clio-plugin` and
-`clio-stderr`, which are not tool calls.
+State comes from the CLIO run store, `~/.copilot/science-runs/` (override with
+`COPILOT_SCIENCE_RUNS`). Each run records `state`, `parent_run_id`, `depth`,
+`tool_calls`, `steers`, `subagents`, `last_tool`, `last_activity` and `pid`.
 
-Tool names are read from the `**<tool>**` head of `ActionProposed` events.
-`ActionApplied` echoes the same name and is skipped, or every call doubles.
+**The store is machine-wide.** Every project on the box writes into it, so a run
+is admitted only on workspace-scoped evidence:
 
-**Observed is a floor, never a ceiling.** Direct editor invocations and
-subagents can be invisible. Zero observed does not mean CLIO was never used.
-Distinct ACP sessions and an absence of observed tool calls do not prove
-clean-context or filesystem sandbox isolation.
+- its run id appears in this workspace's own engine exhaust, or
+- its recorded `Repository:` goal header resolves to this workspace root.
 
-Outstanding investigations are opened-minus-closed **within the scanned
-window**. A bounded tail can clip the opening call, so the figure is clamped at
-zero and flagged `investigationsEstimated`. It is not a verified live count.
+The header is compared as a **resolved path**, not by substring. Substring
+matching is wrong twice over: a symlinked temp directory (`/var` vs
+`/private/var`) fails to match a path that is in fact the same, and a parent
+directory would match every project nested beneath it.
+
+`state` is the run's **own account of itself**. A run killed without updating
+its store still reads `running`, so a recorded-running run whose pid is gone is
+flagged `processMissing` rather than silently rewritten — the dashboard reports
+the discrepancy instead of picking a winner.
+
+Bounded log tails affect only **which investigations are discovered** from the
+exhaust. They do not affect state, which is read from the store. A run whose
+start call has scrolled out of the tail is still found when its goal names this
+workspace.
+
+Observed remains a floor: direct editor invocations can be invisible, so zero
+investigations is not proof CLIO was never used.
 
 ## Events
 
@@ -219,7 +232,10 @@ Verified against Discovery Express 0.15.13 → 0.15.15. Real differences handled
 | dependency field | `dependsOn` only; `dependencies` is rejected |
 | task identity | `name` is a UUID, `dxId` is the human reference |
 | bookshelf sources | identified by `uri`; there is no `name` field |
+| bookshelf layout | 0.15.15 has no `ingest-state.json`; shelves come from `shelves.json`, documents from `providers/<provider>/<shelfId>/documents/*.meta.json`, indexer counts from `index/index-meta.json` |
 | engine events | `Thinking`/`Observation` stream; `Action*`/`Error`/`Done` are whole |
+| CLIO run store | machine-wide at `~/.copilot/science-runs/<run_id>.json`, not inside the workspace |
+| empty vs absent tasks | `tasks/index.json` with `"tasks": []` is a real empty project, not a failed read |
 
 If a future version breaks a source, the failure surfaces in the coverage panel
 rather than as a silently wrong number. When adding support for a new version,

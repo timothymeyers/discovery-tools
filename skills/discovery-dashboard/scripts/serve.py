@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -24,6 +25,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import collect as collector  # noqa: E402
+from collect import _process_start_epoch  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 INDEX_PATH = HERE / "index.html"
@@ -99,6 +101,43 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, "not found", "text/plain; charset=utf-8")
 
 
+def _port_holder(port):
+    """Describe what already holds a port, or None if that cannot be determined.
+
+    Silently stepping to the next port hides the fact that a stale instance —
+    or something else entirely — is sitting on the one the user asked for.
+    """
+    try:
+        proc = subprocess.run(
+            ["lsof", "-nP", "-iTCP:%d" % port, "-sTCP:LISTEN", "-F", "pcn"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None  # lsof missing or not permitted; not an error worth raising
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+
+    pid, command = None, None
+    for line in proc.stdout.splitlines():
+        if line.startswith("p"):
+            pid = line[1:].strip()
+        elif line.startswith("c") and command is None:
+            command = line[1:].strip()
+    if not pid:
+        return None
+
+    detail = "pid %s" % pid
+    if command:
+        detail = "%s (%s)" % (command, detail)
+    started = _process_start_epoch(int(pid)) if pid.isdigit() else None
+    if started:
+        age_h = (time.time() - started) / 3600.0
+        detail += ", running for %s" % (
+            "%.0f h" % age_h if age_h >= 1 else "%.0f min" % (age_h * 60)
+        )
+    return detail
+
+
 def serve(workspace, port, open_browser=True):
     Handler.workspace = workspace
     server = None
@@ -119,7 +158,13 @@ def serve(workspace, port, open_browser=True):
     print("Discovery dashboard: %s   (Ctrl+C to stop)" % url)
     print("Workspace: %s" % workspace)
     if chosen != port:
-        print("Note: port %d was busy; using %d." % (port, chosen))
+        # Say what took the port. A stale dashboard from days ago looks
+        # identical to a fresh one unless the holder is named.
+        holder = _port_holder(port)
+        print("Note: port %d is held by %s; using %d instead."
+              % (port, holder or "an unidentified process", chosen))
+        if holder is None:
+            print("      (could not identify the holder; `lsof` may be unavailable)")
     if open_browser:
         threading.Thread(target=lambda: (time.sleep(0.6), webbrowser.open(url)),
                          daemon=True).start()

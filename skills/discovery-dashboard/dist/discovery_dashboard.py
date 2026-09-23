@@ -9,7 +9,7 @@ Read-only, loopback-only, standard library only.
     python3 discovery_dashboard.py [--port 8787] [--workspace .]
     python3 discovery_dashboard.py --once | --json | --html out.html
 
-Source checksum: af7b7db746246f9a
+Source checksum: fd06e62b988c7688
 """
 
 from __future__ import annotations
@@ -46,6 +46,13 @@ CLIO_VERBS = {
     "mode", "archive", "disposition", "investigate",
 }
 CLIO_VERB_RE = re.compile(r"\bclio-([a-z]+)\b", re.IGNORECASE)
+# CLIO run ids as they appear in call inputs and in clio-start's output.
+RUN_ID_RE = re.compile(r'run_id["\s:]+([0-9a-f]{8,16})\b', re.IGNORECASE)
+# CLIO goals open with a "Repository: <path>" header naming the workspace.
+REPO_HEADER_RE = re.compile(r'^\s*Repository:\s*(.+?)\s*(?:\(|$)', re.M)
+# The same header as a removable prefix, including any parenthetical note.
+GOAL_PREFIX_RE = re.compile(
+    r'^\s*Repository:\s*\S+(?:\s*\([^)]*\))?\s*[.:\u2014-]?\s*', re.IGNORECASE)
 # Tool calls render as **<tool-name>** at the head of the event content.
 TOOL_NAME_RE = re.compile(r"^\*\*(.+?)\*\*")
 # Verbs that open an investigation, and those that close one.
@@ -307,7 +314,12 @@ class Collector:
         entries_dir = tasks_dir / "taskentries"
 
         by_id = {}
-        if isinstance(index, dict) and isinstance(index.get("tasks"), list):
+        # A readable index is what separates "no tasks yet" from "could not read
+        # the tasks". Conflating those is exactly what the coverage model exists
+        # to prevent, so the distinction is tracked rather than inferred from
+        # whether any records happened to load.
+        index_readable = isinstance(index, dict) and isinstance(index.get("tasks"), list)
+        if index_readable:
             coverage.ok("tasks.index", tasks_dir / "index.json")
             for row in index["tasks"]:
                 if not isinstance(row, dict):
@@ -353,6 +365,22 @@ class Collector:
             coverage.missing("tasks.entries", entries_dir)
 
         if not by_id:
+            if index_readable:
+                # Present and genuinely empty: a brand-new project with no task
+                # graph yet. Not a degraded read.
+                coverage.ok("tasks", tasks_dir, "no tasks defined yet")
+                return {
+                    "available": True,
+                    "tasks": [],
+                    "totals": {
+                        "leafTotal": 0, "leafApproved": 0, "leafAwaitingReview": 0,
+                        "allTotal": 0, "executing": 0, "ready": 0, "blocked": 0,
+                        "attention": 0,
+                    },
+                    "workFront": {"executing": [], "ready": [], "blocked": []},
+                    "attention": [], "awaitingReview": [],
+                    "registrationFailures": [], "unresolvedDependencies": [],
+                }
             coverage.partial("tasks", tasks_dir, "no task records could be read")
             return {"available": False, "tasks": [], "totals": {}}
 
@@ -682,91 +710,195 @@ class Collector:
     # -- clio -----------------------------------------------------------
 
     def collect_clio(self, engines, agents, coverage):
-        """Observed CLIO activity. A floor, never a ceiling.
+        """CLIO investigations: how many started, how far they got, and whether
+        they finished.
 
-        Tool names are read from the `**<tool>**` head of ActionProposed
-        events rather than by scanning raw lines, so file paths that merely
-        contain "clio" are not miscounted as invocations.
+        Tool-call tallies are deliberately NOT surfaced. "67 of 70 calls were
+        clio-wait" says nothing about the work; a wait loop is polling, not
+        progress. What matters is the set of investigations and their state.
+
+        Run state comes from the CLIO run store (`~/.copilot/science-runs/`),
+        which records `state`, `parent_run_id`, `depth`, `tool_calls`, `steers`
+        and `last_activity` per run. That store is MACHINE-WIDE and shared by
+        every project on this box, so runs are admitted only on workspace-scoped
+        evidence:
+
+          - the run id was observed in this workspace's own engine exhaust, or
+          - the run's recorded goal names this workspace as its repository.
+
+        Anything else belongs to another project and is excluded. Tool-call
+        scanning is still used, but only to discover which run ids belong here.
         """
-        tool_calls = {}
-        opened = closed = 0
-        scanned = 0
-        truncated_any = False
+        observed_ids, verbs_seen, scanned, truncated_any = self._scan_clio_calls()
 
-        runs_dir = self.discovery / "engine-runs"
-        if runs_dir.is_dir():
-            for definition_dir in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
-                for instance_dir in sorted(p for p in definition_dir.iterdir() if p.is_dir()):
-                    output = instance_dir / "output.jsonl"
-                    if not output.exists():
-                        continue
-                    scanned += 1
-                    lines, truncated = _tail_lines(output)
-                    truncated_any = truncated_any or truncated
-                    for line in lines:
-                        if "clio" not in line.lower() and "autop" not in line.lower():
-                            continue
-                        try:
-                            record = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        # Count proposals only; ActionApplied echoes the same
-                        # name and would double every call.
-                        if _norm_status(record.get("kind")) != "actionproposed":
-                            continue
-                        name = _tool_name(record.get("content"))
-                        if not name:
-                            continue
-                        verb = _clio_verb(name)
-                        if verb:
-                            key = "clio-%s" % verb
-                            tool_calls[key] = tool_calls.get(key, 0) + 1
-                            if verb in CLIO_OPEN_VERBS:
-                                opened += 1
-                            elif verb in CLIO_CLOSE_VERBS:
-                                closed += 1
-                        elif CLIO_TOOL_RE.search(name):
-                            key = name.lower()
-                            tool_calls[key] = tool_calls.get(key, 0) + 1
-
+        runs, store_state = self._read_science_runs(observed_ids, coverage)
         plugin_agents = [a for a in agents if a.get("usesClioPlugin")]
+
         if truncated_any:
             coverage.partial(
                 "clio",
-                runs_dir,
-                "log tails bounded to %d KiB; earlier calls are outside coverage"
+                self.discovery / "engine-runs",
+                "engine log tails are bounded to %d KiB, so an investigation whose "
+                "start call scrolled out of the window is only found if its recorded "
+                "goal names this workspace. Run STATE itself is read from the run "
+                "store and is not affected by this bound."
                 % (TAIL_BYTES // 1024),
             )
         elif scanned:
-            coverage.ok("clio", runs_dir, "%d output log(s) scanned" % scanned)
+            coverage.ok("clio", self.discovery / "engine-runs",
+                        "%d output log(s) scanned" % scanned)
         else:
-            coverage.missing("clio", runs_dir)
+            coverage.missing("clio", self.discovery / "engine-runs")
 
-        # Open-minus-closed is an estimate from a bounded window. If the window
-        # clipped the opening call, this can read low or negative; it is
-        # clamped and labelled rather than presented as a count.
-        outstanding = max(0, opened - closed)
+        by_state = {}
+        for run in runs:
+            by_state[run["state"]] = by_state.get(run["state"], 0) + 1
 
         return {
-            "available": scanned > 0 or bool(plugin_agents),
-            "observedToolCalls": sorted(
-                ({"tool": k, "count": v} for k, v in tool_calls.items()),
-                key=lambda r: -r["count"],
-            ),
-            "observedTotal": sum(tool_calls.values()),
-            "investigationsOpened": opened,
-            "investigationsClosed": closed,
-            "investigationsOutstanding": outstanding,
-            "investigationsEstimated": truncated_any,
+            "available": bool(runs) or scanned > 0 or bool(plugin_agents),
+            "investigations": runs,
+            "counts": {
+                "total": len(runs),
+                "running": by_state.get("running", 0),
+                "done": by_state.get("done", 0),
+                "stopped": by_state.get("stopped", 0),
+                "unknown": by_state.get("unknown", 0),
+                "topLevel": sum(1 for r in runs if not r.get("parentRunId")),
+                "subagentRuns": sum(1 for r in runs if r.get("parentRunId")),
+            },
+            "runStore": store_state,
+            "verbsObserved": sorted(verbs_seen),
             "pluginAgents": len(plugin_agents),
             "logsTruncated": truncated_any,
             "caveat": (
-                "Observed structured tool calls only, within bounded log tails. "
-                "Direct editor invocations and subagents can be invisible. "
-                "Zero observed does not mean CLIO was never used. Outstanding "
-                "investigations are opened-minus-closed within the scanned "
-                "window, not a verified live count."
+                "Investigations are scoped to this workspace: a run is listed only "
+                "if its id appears in this workspace's engine exhaust or its recorded "
+                "goal names this workspace. State is what the run recorded for itself; "
+                "a run killed without updating its store still reads as running, which "
+                "is why a missing process is called out separately. Direct editor "
+                "invocations can be invisible, so zero is not proof CLIO was unused."
             ),
+        }
+
+    def _scan_clio_calls(self):
+        """Find CLIO run ids referenced in this workspace's engine exhaust.
+
+        Only used for scoping. Call counts are not reported: a `clio-wait`
+        tally measures polling frequency, not investigation progress.
+        """
+        observed_ids, verbs = set(), set()
+        scanned, truncated_any = 0, False
+
+        runs_dir = self.discovery / "engine-runs"
+        if not runs_dir.is_dir():
+            return observed_ids, verbs, scanned, truncated_any
+
+        for definition_dir in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
+            for instance_dir in sorted(p for p in definition_dir.iterdir() if p.is_dir()):
+                output = instance_dir / "output.jsonl"
+                if not output.exists():
+                    continue
+                scanned += 1
+                lines, truncated = _tail_lines(output)
+                truncated_any = truncated_any or truncated
+                for line in lines:
+                    low = line.lower()
+                    if "clio" not in low and "autop" not in low and "run_id" not in low:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    content = record.get("content")
+                    if not isinstance(content, str):
+                        continue
+                    name = _tool_name(content)
+                    verb = _clio_verb(name) if name else None
+                    if verb:
+                        verbs.add(verb)
+                    # run ids appear in call inputs and in clio-start's output
+                    if verb or CLIO_TOOL_RE.search(name or ""):
+                        observed_ids.update(RUN_ID_RE.findall(content))
+        return observed_ids, verbs, scanned, truncated_any
+
+    def _read_science_runs(self, observed_ids, coverage):
+        """Read the CLIO run store, admitting only workspace-scoped runs."""
+        store = Path(
+            os.environ.get("COPILOT_SCIENCE_RUNS")
+            or (Path.home() / ".copilot" / "science-runs")
+        )
+        if not store.is_dir():
+            coverage.missing("clio.runs", store,
+                             "no CLIO run store; investigation state unavailable")
+            return [], "missing"
+
+        runs, admitted, total = [], 0, 0
+        for path in sorted(store.glob("*.json")):
+            record = _read_json(path)
+            if not isinstance(record, dict) or not record.get("run_id"):
+                continue
+            total += 1
+            run_id = str(record["run_id"])
+            goal = record.get("goal") or ""
+            in_exhaust = run_id in observed_ids
+            names_workspace = self._goal_names_workspace(goal)
+            if not (in_exhaust or names_workspace):
+                continue
+            admitted += 1
+            runs.append(self._science_run_record(record, run_id, goal,
+                                                 in_exhaust, names_workspace))
+
+        coverage.ok("clio.runs", store,
+                    "%d of %d run(s) scoped to this workspace" % (admitted, total))
+        runs.sort(key=lambda r: r.get("startedAt") or "", reverse=True)
+        return runs, "ok"
+
+    def _goal_names_workspace(self, goal):
+        """True when a CLIO goal's "Repository:" header is this workspace.
+
+        Compared as resolved paths rather than by substring. Substring matching
+        is wrong twice over: a symlinked temp dir (/var vs /private/var) fails
+        to match a path that is in fact the same, and a parent directory would
+        match every project nested beneath it.
+        """
+        match = REPO_HEADER_RE.search(goal or "")
+        if not match:
+            return False
+        try:
+            candidate = Path(match.group(1).strip()).resolve()
+        except (OSError, ValueError):
+            return False
+        return candidate == self.root
+
+    def _science_run_record(self, record, run_id, goal, in_exhaust, names_workspace):
+        state = _norm_status(record.get("state")) or "unknown"
+        if state not in ("running", "done", "stopped"):
+            state = state or "unknown"
+
+        # A run that recorded itself as running but whose process is gone died
+        # without updating its store. Reported separately rather than silently
+        # rewritten, because the store is the run's own account of itself.
+        pid = record.get("pid")
+        process_missing = False
+        if state == "running" and pid:
+            process_missing = _process_start_epoch(pid) is None
+
+        return {
+            "runId": run_id,
+            "parentRunId": record.get("parent_run_id"),
+            "depth": record.get("depth") or 0,
+            "state": state,
+            "processMissing": process_missing,
+            # First line of the goal is the most legible summary available.
+            "goal": _first_meaningful_line(goal),
+            "startedAt": _normalize_run_time(record.get("started")),
+            "updatedAt": _normalize_run_time(record.get("updated")),
+            "toolCalls": record.get("tool_calls"),
+            "steers": record.get("steers"),
+            "subagents": record.get("subagents"),
+            "lastTool": record.get("last_tool"),
+            "lastActivity": record.get("last_activity"),
+            "scopedBy": "exhaust" if in_exhaust else "goal",
         }
 
     # -- live log -------------------------------------------------------
@@ -993,9 +1125,82 @@ class Collector:
                         "error": entry.get("error"),
                     }
                 )
+        shelves = self._collect_shelves(shelf_dir, coverage)
+        documents = sum(s["documentsOnDisk"] for s in shelves)
         coverage.ok("bookshelf", shelf_dir,
-                    "%d source(s), %d failed" % (len(sources), failures))
-        return {"available": True, "sources": sources, "failed": failures}
+                    "%d shelf(s), %d document(s), %d ingest source(s), %d failed"
+                    % (len(shelves), documents, len(sources), failures))
+        return {"available": True, "shelves": shelves, "documents": documents,
+                "sources": sources, "failed": failures}
+
+    def _collect_shelves(self, shelf_dir, coverage):
+        """Shelves from shelves.json (0.15.15+), counted from provider stores.
+
+        Documents are counted from `<provider>/<shelfId>/documents/*.meta.json`
+        on disk; `index/index-meta.json` is what the indexer last reported.
+        The two are shown side by side, never merged. Only allowlisted meta
+        fields are read — document bodies are never opened.
+        """
+        shelves_path = shelf_dir / "shelves.json"
+        if not shelves_path.exists():
+            coverage.missing("bookshelf.shelves", shelves_path)
+            return []
+        data = _read_json(shelves_path, coverage, "bookshelf.shelves")
+        entries = data.get("shelves") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            if data is not None:
+                coverage.error("bookshelf.shelves", shelves_path, "no shelves list")
+            return []
+
+        shelves = []
+        for entry in entries:
+            if not isinstance(entry, dict) or not entry.get("shelfId"):
+                continue
+            shelf_id = str(entry["shelfId"])
+            configs = [c for c in entry.get("providerConfigs") or [] if isinstance(c, dict)]
+            kind = next((str((c.get("metadata") or {}).get("kind"))
+                         for c in configs if (c.get("metadata") or {}).get("kind")), None)
+            on_disk, indexed, last_indexed, docs = 0, None, None, []
+            for config in configs:
+                provider = str(config.get("providerId") or config.get("providerType") or "")
+                # Ids come from the workspace's own manifest; refuse traversal.
+                if not provider or "/" in provider or ".." in provider \
+                        or "/" in shelf_id or ".." in shelf_id:
+                    continue
+                store = shelf_dir / "providers" / provider / shelf_id
+                doc_dir = store / "documents"
+                if doc_dir.is_dir():
+                    for meta_path in sorted(doc_dir.glob("*.meta.json")):
+                        on_disk += 1
+                        if len(docs) >= 40:
+                            continue
+                        meta = _read_json(meta_path)
+                        if isinstance(meta, dict):
+                            docs.append({
+                                "title": meta.get("title") or meta.get("sourceId"),
+                                "sourceRef": meta.get("sourceRef"),
+                                "writtenAt": meta.get("writtenAt"),
+                            })
+                index_meta = _read_json(store / "index" / "index-meta.json")
+                if isinstance(index_meta, dict):
+                    if isinstance(index_meta.get("documentCount"), int):
+                        indexed = (indexed or 0) + index_meta["documentCount"]
+                    last_indexed = max(filter(None, [last_indexed,
+                                                     index_meta.get("lastIndexedAt")]),
+                                       default=None)
+            shelves.append({
+                "shelfId": shelf_id,
+                "name": entry.get("name") or shelf_id,
+                "description": entry.get("description"),
+                "kind": kind,
+                "providers": [c.get("providerId") for c in configs],
+                "documentsOnDisk": on_disk,
+                "indexedDocuments": indexed,
+                "lastIndexedAt": last_indexed,
+                "documents": docs,
+            })
+        coverage.ok("bookshelf.shelves", shelves_path, "%d shelf(s)" % len(shelves))
+        return shelves
 
     # -- snapshot --------------------------------------------------------
 
@@ -1142,6 +1347,43 @@ def _clio_verb(tool_name):
     return verb if verb in CLIO_VERBS else None
 
 
+def _first_meaningful_line(text):
+    """The human-readable part of a CLIO goal.
+
+    Goals open with a "Repository: <path> (<note>)" header. That header is
+    scoping metadata, not a description, and it is NOT always on its own line —
+    it is frequently the start of the same sentence as the real goal. Dropping
+    the whole line therefore discards the description, so the prefix is removed
+    instead.
+    """
+    if not isinstance(text, str):
+        return None
+    cleaned = GOAL_PREFIX_RE.sub("", text, count=1)
+    for line in cleaned.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower().startswith("context:"):
+            line = line[len("context:"):].strip()
+            if not line:
+                continue
+        return line[:240]
+    return None
+
+
+def _normalize_run_time(value):
+    """CLIO records 'YYYY-MM-DD HH:MM:SSZ'; convert to ISO 8601 for the UI."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    for fmt in ("%Y-%m-%d %H:%M:%SZ", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            continue
+    return _iso(_parse_iso(text))
+
+
 def collect(workspace="."):
     return Collector(workspace).snapshot()
 
@@ -1177,12 +1419,19 @@ def summarize(snapshot):
         )
     clio = snapshot["clio"]
     if clio.get("available"):
+        counts = clio.get("counts", {})
         lines.append(
-            "  clio: %d observed call(s), %d investigation(s) outstanding%s, %d plugin agent(s)"
-            % (clio.get("observedTotal", 0), clio.get("investigationsOutstanding", 0),
-               " (estimated)" if clio.get("investigationsEstimated") else "",
-               clio.get("pluginAgents", 0))
+            "  clio: %d investigation(s) — %d running, %d done, %d stopped"
+            % (counts.get("total", 0), counts.get("running", 0),
+               counts.get("done", 0), counts.get("stopped", 0))
         )
+        for run in clio.get("investigations", [])[:5]:
+            flag = " [process missing]" if run.get("processMissing") else ""
+            lines.append(
+                "    %-12s %-8s %s%s"
+                % (run.get("runId"), run.get("state"),
+                   (run.get("lastActivity") or run.get("goal") or "")[:60], flag)
+            )
     degraded = snapshot["coverage"]["degraded"]
     if degraded:
         lines.append("  COVERAGE GAPS (%d):" % len(degraded))
@@ -1427,7 +1676,7 @@ function panel(title, count, inner, extra) {
     <div class="body">${inner}${extra ? `<div class="note">${extra}</div>` : ""}</div></div>`;
 }
 function collapsed(title, count, inner, extra) {
-  return `<details class="panel"><summary>${esc(title)}${
+  return `<details class="panel" data-key="${esc(title)}"><summary>${esc(title)}${
     count != null ? ` <span class="count">${esc(count)}</span>` : ""}</summary>
     <div class="body">${inner}${extra ? `<div class="note">${extra}</div>` : ""}</div></details>`;
 }
@@ -1457,6 +1706,20 @@ function renderOverview(s) {
   const out = [];
   const T = s.tasks || {}, totals = T.totals || {}, A = s.alerts || {},
         C = A.counts || {};
+  const W = T.workFront || {};
+
+  // Engines.
+  const engines = (s.engines && s.engines.engines) || [];
+  const live = engines.filter(e => e.liveness === "running").length;
+  const unknown = engines.filter(e => e.liveness === "unknown").length;
+  const engineRows = engines.length ? `<ul class="list">` + engines.slice(0, 12).map(e =>
+    `<li><span class="ttl">${esc(e.definitionId || "")}
+      <span class="sub mono">${esc((e.instanceId || "").slice(0, 12))}</span>
+      <div class="sub">${esc(e.adapterKind || "")}${
+        e.startedAt ? " · started " + esc(ago(e.startedAt)) : ""}${
+        e.livenessBasis ? " · " + esc(e.livenessBasis) : ""}</div></span>
+      <span class="pill ${esc(e.liveness)}">${esc(e.liveness)}</span></li>`
+  ).join("") + `</ul>` : empty("No engine runs recorded.");
 
   // Hero. Approved and awaiting review are DISTINCT segments and are never
   // summed into one "done" number.
@@ -1490,75 +1753,77 @@ function renderOverview(s) {
      <b>Awaiting review</b> means <code>executionDone</code> — it is not approval,
      and is never added to approved.`));
 
-  // Alerts, split three ways.
-  const alertCol = (title, items, cls) => `
-    <div class="panel"><h2>${esc(title)} <span class="count">${items.length}</span></h2>
-    <div class="body">${items.length ? `<ul class="list">` + items.slice(0, 14).map(i =>
-      `<li><span class="ttl">${esc(i.label)}<div class="sub">${esc(i.detail)}</div></span></li>`
-    ).join("") + `</ul>` : empty("None.")}</div></div>`;
-  out.push(`<div class="grid g3" style="margin-top:14px">
-    ${alertCol("Action needed now", A.actionNeeded || [])}
-    ${alertCol("Blocked by dependencies", A.blocked || [])}
-    ${alertCol("Awaiting review", A.awaitingReview || [])}
-  </div>`);
-
-  // Work front.
-  const W = T.workFront || {};
+  // Realtime row: what is running, what needs review, which engines are alive.
   out.push(`<div class="grid g3" style="margin-top:14px">
     ${panel("Executing", (W.executing || []).length,
       taskList(W.executing, { showStatus: true, emptyText: "Nothing executing." }))}
-    ${panel("Ready", (W.ready || []).length,
-      taskList(W.ready, { emptyText: "Nothing ready." }))}
-    ${panel("Blocked", (W.blocked || []).length,
-      taskList(W.blocked, { showBlockers: true, emptyText: "Nothing blocked." }),
-      `Blockers are derived from current <code>dependsOn</code> edges. A dependency that
-       cannot be resolved stays a blocker rather than being assumed satisfied.`)}
+    ${panel("Awaiting review", (T.awaitingReview || []).length,
+      taskList(T.awaitingReview, { showStatus: true, emptyText: "Nothing awaiting review." }),
+      `<code>executionDone</code> — finished executing, <b>not</b> approved.`)}
+    ${panel("Engines", `${live} running · ${unknown} unknown · ${engines.length} total`,
+      engineRows,
+      `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
+       not be verified against its recorded start time. Age is never used to infer a stall.`)}
   </div>`);
-
-  // Engines.
-  const engines = (s.engines && s.engines.engines) || [];
-  const live = engines.filter(e => e.liveness === "running").length;
-  const unknown = engines.filter(e => e.liveness === "unknown").length;
-  const engineRows = engines.length ? `<table><thead><tr>
-      <th>Engine</th><th>State</th><th>Adapter</th><th>Started</th><th>Basis</th>
-    </tr></thead><tbody>` + engines.slice(0, 12).map(e => `<tr>
-      <td>${esc(e.definitionId || "")}<div class="sub mono">${
-        esc((e.instanceId || "").slice(0, 12))}</div></td>
-      <td><span class="pill ${esc(e.liveness)}">${esc(e.liveness)}</span></td>
-      <td class="sub">${esc(e.adapterKind || "")}</td>
-      <td class="sub">${esc(ago(e.startedAt))}</td>
-      <td class="sub">${esc(e.livenessBasis || "")}</td>
-    </tr>`).join("") + `</tbody></table>`
-    : empty("No engine runs recorded.");
 
   // Agents.
   const agents = (s.agents && s.agents.agents) || [];
   const activeAgents = agents.filter(a => !a.completedAt);
   const regFails = agents.filter(a => a.registrationFailure);
   const K = s.clio || {};
+  const KC = K.counts || {};
+  const investigations = K.investigations || [];
 
-  out.push(`<div class="grid g2" style="margin-top:14px">
-    ${panel("Engines", `${live} running · ${unknown} unknown · ${engines.length} total`,
-      engineRows,
-      `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
-       not be verified against its recorded start time. Age is never used to infer a stall.`)}
-    ${panel("Agents & CLIO", `${agents.length} run(s)`, `
+  const actionItems = A.actionNeeded || [];
+  out.push(`<div class="grid g3" style="margin-top:14px">
+    ${panel("Action needed now", actionItems.length, actionItems.length
+      ? `<ul class="list">` + actionItems.slice(0, 14).map(i =>
+          `<li><span class="ttl">${esc(i.label)}<div class="sub">${esc(i.detail)}</div></span></li>`
+        ).join("") + `</ul>` : empty("None."))}
+    ${panel("Ready", (W.ready || []).length,
+      taskList(W.ready, { emptyText: "Nothing ready." }))}
+    ${panel("Investigations & agents",
+      `${(KC.total || 0)} investigation(s) · ${agents.length} agent run(s)`, `
       <div class="tiles" style="margin-bottom:10px">
-        ${tile(activeAgents.length, "no completedAt", activeAgents.length ? "info" : "")}
+        ${tile(KC.running || 0, "running", (KC.running ? "info" : ""))}
+        ${tile(KC.done || 0, "complete", (KC.done ? "ok" : ""))}
+        ${tile(KC.stopped || 0, "stopped", (KC.stopped ? "warn" : ""))}
         ${tile(regFails.length, "never started", regFails.length ? "bad" : "")}
-        ${tile(K.observedTotal || 0, "clio calls")}
-        ${tile(K.investigationsOutstanding || 0, "investigations",
-               K.investigationsOutstanding ? "info" : "")}
       </div>
-      ${agents.length ? `<ul class="list">` + agents.slice(0, 8).map(a =>
+      ${investigations.length ? `<ul class="list">` + investigations.slice(0, 8).map(r =>
+        `<li><span class="ttl">${r.depth ? "↳ " : ""}${
+            esc(r.goal || "(no recorded goal)")}
+          <div class="sub"><span class="mono">${esc(r.runId)}</span>${
+            r.lastActivity ? " · " + esc(r.lastActivity) : ""}${
+            r.toolCalls != null ? ` · ${r.toolCalls} step(s)` : ""}${
+            r.steers ? ` · ${r.steers} steer(s)` : ""}${
+            r.subagents ? ` · ${r.subagents} subagent(s)` : ""}${
+            r.updatedAt ? " · " + esc(ago(r.updatedAt)) : ""}</div></span>
+          <span class="pill ${r.state === "running" ? "running"
+            : r.state === "done" ? "finished" : "warn"}">${esc(r.state)}</span>${
+          r.processMissing
+            ? `<span class="pill stopped">process gone</span>` : ""}
+        </li>`).join("") + `</ul>`
+        : empty("No investigations scoped to this workspace.")}
+      ${agents.length ? `<div class="sub" style="margin-top:10px">Catalog agent runs</div>
+        <ul class="list">` + agents.slice(0, 5).map(a =>
         `<li><span class="ttl">${esc(a.agentId || a.key)}
           <div class="sub">${esc(a.status || "")}${
-            a.taskId ? " · " + esc(a.taskId) : ""}${
-            a.aliasCount > 1 ? ` · ${a.aliasCount} ids` : ""}</div></span>
+            a.taskId ? " · " + esc(a.taskId) : ""}</div></span>
           ${a.registrationFailure ? `<span class="pill stopped">never started</span>` : ""}
-        </li>`).join("") + `</ul>` : empty("No agent runs found.")}`,
-      `${esc(K.caveat || "")}`)}
+        </li>`).join("") + `</ul>` : ""}`,
+      `Investigation state is what each CLIO run recorded for itself. Call counts are
+       not shown: a <code>clio-wait</code> tally measures polling, not progress.
+       Catalog agent runs are dispatched separately; work an engine does itself is not
+       counted here. ${esc(K.caveat || "")}`)}
   </div>`);
+
+  // Not realtime-critical, so collapsed by default.
+  out.push(`<div style="margin-top:14px">` + collapsed("Blocked by dependencies",
+    (W.blocked || []).length,
+    taskList(W.blocked, { showBlockers: true, emptyText: "Nothing blocked." }),
+    `Blockers are derived from current <code>dependsOn</code> edges. A dependency that
+     cannot be resolved stays a blocker rather than being assumed satisfied.`) + `</div>`);
 
   return out.join("");
 }
@@ -1609,16 +1874,36 @@ function renderDiagnostics(s) {
       : empty("No purpose recorded.")));
 
   const B = s.bookshelf || {};
-  out.push(collapsed("Bookshelf",
-    B.available ? `${(B.sources || []).length} source(s)${B.failed ? ` · ${B.failed} failed` : ""}`
-                : "absent",
-    (B.sources || []).length ? `<ul class="list">` + B.sources.map(x =>
+  const shelves = B.shelves || [];
+  const shelfBlock = shelves.map(sh => {
+    const docs = sh.documents || [];
+    const idx = sh.indexedDocuments == null ? "no index metadata"
+      : `index reports ${sh.indexedDocuments} doc(s)` +
+        (sh.lastIndexedAt ? ` · last indexed ${ago(sh.lastIndexedAt)}` : "");
+    return `<div style="margin-bottom:12px"><b>${esc(sh.name)}</b>
+      ${sh.kind ? `<span class="pill">${esc(sh.kind)}</span>` : ""}
+      <div class="sub">${sh.documentsOnDisk} document(s) on disk · ${esc(idx)}</div>
+      ${sh.description ? `<div class="sub">${esc(String(sh.description).slice(0, 240))}</div>` : ""}
+      ${docs.length ? `<ul class="list">` + docs.slice(0, 12).map(d =>
+        `<li><span class="ttl">${esc(d.title || "")}<div class="sub">${
+          esc(d.sourceRef || "")}${d.writtenAt ? " · " + esc(ago(d.writtenAt)) : ""}</div></span></li>`
+      ).join("") + `</ul>` + (sh.documentsOnDisk > 12
+        ? `<div class="sub">+${sh.documentsOnDisk - 12} more</div>` : "") : ""}
+    </div>`;
+  }).join("");
+  const legacy = (B.sources || []).length ? `<ul class="list">` + B.sources.map(x =>
       `<li><span class="ttl">${esc(x.name || x.uri || "")}${
          x.error ? `<div class="sub">${esc(String(x.error).slice(0, 160))}</div>` : ""}</span>
        <span class="pill ${x.outcome === "indexed" ? "finished" : "warn"}">${
-         esc(x.outcome || x.status || "—")}</span></li>`).join("") + `</ul>`
-      : empty(B.available ? "No ingest state recorded." : "No bookshelf in this workspace.")));
-
+         esc(x.outcome || x.status || "—")}</span></li>`).join("") + `</ul>` : "";
+  out.push(collapsed("Bookshelf",
+    B.available ? `${shelves.length} shelf(s) · ${B.documents || 0} document(s)${
+      (B.sources || []).length ? ` · ${B.sources.length} ingest source(s)` : ""}${
+      B.failed ? ` · ${B.failed} failed` : ""}` : "absent",
+    (shelfBlock || legacy) ? shelfBlock + legacy
+      : empty(B.available ? "No shelves or ingest state recorded." : "No bookshelf in this workspace."),
+    `Documents on disk and the indexer's own count are shown side by side; a gap means
+     indexing has not caught up, not that documents were lost.`));
   const cov = (s.coverage && s.coverage.entries) || [];
   const bad = cov.filter(c => c.state === "error" || c.state === "partial");
   out.push(collapsed("Coverage & gaps", `${bad.length} degraded / ${cov.length} sources`,
@@ -1631,13 +1916,30 @@ function renderDiagnostics(s) {
      Discovery versions. <b>error</b> and <b>partial</b> mean the dashboard could not fully
      read something, which is reported separately from a source that is genuinely empty.`));
 
+  // Investigations are shown on the Overview. A per-verb call table used to live
+  // here; it was removed because the counts are dominated by clio-wait polling
+  // and say nothing about what the investigations did.
   const K = s.clio || {};
-  if ((K.observedToolCalls || []).length) {
-    out.push(collapsed("CLIO tool calls", `${K.observedTotal} observed`,
-      `<table><thead><tr><th>Tool</th><th>Count</th></tr></thead><tbody>` +
-      K.observedToolCalls.map(t =>
-        `<tr><td class="mono">${esc(t.tool)}</td><td>${t.count}</td></tr>`
-      ).join("") + `</tbody></table>`, esc(K.caveat || "")));
+  const runs = K.investigations || [];
+  if (runs.length) {
+    out.push(collapsed("Investigation detail", `${runs.length} run(s)`,
+      `<table><thead><tr>
+        <th>Run</th><th>State</th><th>Steps</th><th>Last activity</th>
+        <th>Started</th><th>Scope</th>
+      </tr></thead><tbody>` + runs.map(r => `<tr>
+        <td class="mono">${r.depth ? "↳ " : ""}${esc(r.runId)}${
+          r.parentRunId ? `<div class="sub mono">under ${esc(r.parentRunId)}</div>` : ""}</td>
+        <td><span class="pill ${r.state === "running" ? "running"
+          : r.state === "done" ? "finished" : "warn"}">${esc(r.state)}</span></td>
+        <td class="sub">${r.toolCalls == null ? "—" : r.toolCalls}</td>
+        <td class="sub">${esc(r.lastActivity || r.lastTool || "")}</td>
+        <td class="sub">${esc(ago(r.startedAt))}</td>
+        <td class="sub">${esc(r.scopedBy)}</td>
+      </tr>`).join("") + `</tbody></table>`,
+      `<b>Scope</b> is how the run was tied to this workspace: <code>exhaust</code>
+       means its id appeared in this workspace's engine logs, <code>goal</code> means
+       its recorded goal names this workspace. The run store is machine-wide, so
+       anything matching neither belongs to another project and is excluded.`));
   }
 
   return `<div class="grid" style="gap:14px">${out.join("")}</div>`;
@@ -1660,9 +1962,17 @@ function renderMethodology(s) {
         reports <b>unknown</b>. A live shared host does not prove a worker is healthy.</li>
     <li>Agent runs are deduplicated across an alias graph of every id they are known by, not
         a single run id.</li>
-    <li>CLIO figures are <b>observed structured tool calls within bounded log tails</b>.
-        Direct invocations and subagents can be invisible; zero observed does not mean CLIO
-        was never used.</li>
+    <li>CLIO <b>investigations</b> are listed with the state each run recorded for
+        itself — running, done or stopped. Tool-call counts are deliberately not shown:
+        a <code>clio-wait</code> tally measures polling frequency, not progress.</li>
+    <li>The CLIO run store is <b>machine-wide</b>. A run is listed only if its id appears
+        in this workspace's engine exhaust, or its recorded goal names this workspace.
+        Runs belonging to other projects are excluded.</li>
+    <li>A run that recorded itself as <code>running</code> but whose process is gone is
+        flagged <b>process gone</b> rather than silently rewritten — the store is the
+        run's own account of itself, and it may simply have died without updating.</li>
+    <li>Bounded log tails affect only <b>which investigations are discovered</b> from the
+        exhaust, not their state, which is read from the run store.</li>
     <li>Blockers come from live <code>dependsOn</code> edges. An unresolvable dependency
         stays a blocker. Both <code>complete</code> and <code>executionDone</code> satisfy one.</li>
     <li>Historical errors do not raise current alerts.</li>
@@ -1679,8 +1989,14 @@ function renderMethodology(s) {
 function render() {
   if (!snap) return;
   document.getElementById("ws").textContent = snap.workspaceName || snap.workspace || "";
+  // Auto-refresh replaces the DOM; keep whichever collapsed panels the user opened.
+  const open = new Set([...document.querySelectorAll("details[data-key][open]")]
+    .map(d => d.dataset.key));
   document.getElementById("overview").innerHTML = renderOverview(snap);
   document.getElementById("diagnostics").innerHTML = renderDiagnostics(snap);
+  document.querySelectorAll("details[data-key]").forEach(d => {
+    if (open.has(d.dataset.key)) d.open = true;
+  });
   document.getElementById("methodology").innerHTML = renderMethodology(snap);
 }
 
@@ -1761,6 +2077,7 @@ schedule();
 import argparse
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -1838,6 +2155,43 @@ class Handler(BaseHTTPRequestHandler):
             self._send(404, "not found", "text/plain; charset=utf-8")
 
 
+def _port_holder(port):
+    """Describe what already holds a port, or None if that cannot be determined.
+
+    Silently stepping to the next port hides the fact that a stale instance —
+    or something else entirely — is sitting on the one the user asked for.
+    """
+    try:
+        proc = subprocess.run(
+            ["lsof", "-nP", "-iTCP:%d" % port, "-sTCP:LISTEN", "-F", "pcn"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None  # lsof missing or not permitted; not an error worth raising
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+
+    pid, command = None, None
+    for line in proc.stdout.splitlines():
+        if line.startswith("p"):
+            pid = line[1:].strip()
+        elif line.startswith("c") and command is None:
+            command = line[1:].strip()
+    if not pid:
+        return None
+
+    detail = "pid %s" % pid
+    if command:
+        detail = "%s (%s)" % (command, detail)
+    started = _process_start_epoch(int(pid)) if pid.isdigit() else None
+    if started:
+        age_h = (time.time() - started) / 3600.0
+        detail += ", running for %s" % (
+            "%.0f h" % age_h if age_h >= 1 else "%.0f min" % (age_h * 60)
+        )
+    return detail
+
+
 def serve(workspace, port, open_browser=True):
     Handler.workspace = workspace
     server = None
@@ -1858,7 +2212,13 @@ def serve(workspace, port, open_browser=True):
     print("Discovery dashboard: %s   (Ctrl+C to stop)" % url)
     print("Workspace: %s" % workspace)
     if chosen != port:
-        print("Note: port %d was busy; using %d." % (port, chosen))
+        # Say what took the port. A stale dashboard from days ago looks
+        # identical to a fresh one unless the holder is named.
+        holder = _port_holder(port)
+        print("Note: port %d is held by %s; using %d instead."
+              % (port, holder or "an unidentified process", chosen))
+        if holder is None:
+            print("      (could not identify the holder; `lsof` may be unavailable)")
     if open_browser:
         threading.Thread(target=lambda: (time.sleep(0.6), webbrowser.open(url)),
                          daemon=True).start()

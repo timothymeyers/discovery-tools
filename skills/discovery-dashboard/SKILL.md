@@ -13,7 +13,7 @@ description: |
   "how close are we to done", "are the engines still running", "is anything
   running", "are any agents running", "is clio running", "open the dashboard".
 metadata:
-  version: "1"
+  version: "2"
   category: "Cross-domain"
   subfield: "Research platform observability"
 ---
@@ -54,12 +54,20 @@ stop. Standard library only — there is nothing to install.
    | Intent | Command |
    |---|---|
    | "what's stuck?" / "where are we?" | `python3 "$DASH" --workspace <ws> --once` |
-   | "open the dashboard" | `python3 "$DASH" --workspace <ws>` |
+   | "open the dashboard" | `python3 "$DASH" --workspace <ws> --no-open` then open the printed URL in Discovery App's integrated browser |
    | feed another tool | `python3 "$DASH" --workspace <ws> --json` |
    | share a frozen view | `python3 "$DASH" --workspace <ws> --html out.html` |
 
+   **"Open the dashboard" means a tab inside Discovery App, not the system
+   browser.** Always pass `--no-open` and then open the loopback URL the server
+   prints using the app's integrated browser. Only fall back to the system
+   browser if the user asks for it, or if there is no integrated browser
+   available.
+
    Other flags: `--port N` (default 8787, walks forward up to +20 if busy) and
-   `--no-open` to suppress the browser.
+   `--no-open` to suppress the browser. If the requested port is already taken
+   the server names what holds it rather than silently moving — a stale
+   dashboard from days ago otherwise looks identical to a fresh one.
 
 3. **Report with the caveats attached.** See *Reading the numbers* below. The
    caveats are the product; a bare number from this dashboard is a misuse of it.
@@ -93,11 +101,17 @@ Repeat these when reporting figures.
   and `writtenAtUtc` are startup metadata; a log's mtime means a log was
   written, not that an event occurred. This dashboard will not tell you
   something is stalled, because it cannot honestly know that.
-- **CLIO figures are a floor, not a census.** They count observed structured
-  `clio-*` calls inside bounded log tails. Direct invocations and subagents can
-  be invisible. Zero observed does not mean CLIO was unused. Outstanding
-  investigations are opened-minus-closed *within the scanned window* and are
-  labelled estimated — do not report them as a live count.
+- **CLIO is reported as investigations, not call counts.** Report how many runs
+  started, how far they got, and whether they finished. Tool-call tallies are
+  deliberately not shown and should not be quoted: "67 of 70 calls were
+  `clio-wait`" measures polling frequency, not progress.
+- **Investigation state is each run's own account of itself.** A run killed
+  without updating its store still reads `running`; the dashboard flags
+  **process gone** rather than silently rewriting the state.
+- **The CLIO run store is machine-wide.** A run is listed only if its id appears
+  in this workspace's engine exhaust, or its recorded goal names this workspace.
+  Runs from other projects on the same machine are excluded. Direct editor
+  invocations can still be invisible, so zero is not proof CLIO was unused.
 - **Blockers** come from live `dependsOn` edges. A dependency that cannot be
   resolved stays a blocker rather than being assumed satisfied. Both `complete`
   and `executionDone` satisfy one.
@@ -113,11 +127,18 @@ Read it before changing any collector logic.
 
 ## Layout
 
-**Overview** — progress, the three alert buckets, the work front, engines,
-agents and CLIO.
+**Overview** — progress, then a realtime row (executing, awaiting review,
+engines), then action needed now, ready, and investigations and agents.
+**Blocked by dependencies** sits at the bottom, collapsed: it is not something
+you watch live. Collapsed panels keep their open/closed state across
+auto-refresh.
 
 **Diagnostics** (collapsed by default) — live log, git activity, purpose and
-outcomes, bookshelf ingest, coverage and gaps.
+outcomes, bookshelf, investigation detail, coverage and gaps.
+
+Bookshelf shows, per shelf, the documents on disk and the indexer's own count
+**side by side and never merged** — a gap between them means indexing has not
+caught up, not that documents were lost. Only document metadata is read.
 
 ## Safety
 
