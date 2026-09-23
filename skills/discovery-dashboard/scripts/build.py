@@ -78,6 +78,9 @@ def build():
         'import collect as collector  # noqa: E402\n',
         '',
     )
+    # Collector helpers are already in this module's namespace in the bundle.
+    serve_body = serve_body.replace(
+        'from collect import _process_start_epoch  # noqa: E402\n', '')
     serve_body = serve_body.replace(
         'HERE = Path(__file__).resolve().parent\nINDEX_PATH = HERE / "index.html"\n',
         '',

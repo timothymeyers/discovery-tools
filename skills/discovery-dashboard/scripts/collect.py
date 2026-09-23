@@ -102,6 +102,13 @@ CLIO_VERBS = {
     "mode", "archive", "disposition", "investigate",
 }
 CLIO_VERB_RE = re.compile(r"\bclio-([a-z]+)\b", re.IGNORECASE)
+# CLIO run ids as they appear in call inputs and in clio-start's output.
+RUN_ID_RE = re.compile(r'run_id["\s:]+([0-9a-f]{8,16})\b', re.IGNORECASE)
+# CLIO goals open with a "Repository: <path>" header naming the workspace.
+REPO_HEADER_RE = re.compile(r'^\s*Repository:\s*(.+?)\s*(?:\(|$)', re.M)
+# The same header as a removable prefix, including any parenthetical note.
+GOAL_PREFIX_RE = re.compile(
+    r'^\s*Repository:\s*\S+(?:\s*\([^)]*\))?\s*[.:\u2014-]?\s*', re.IGNORECASE)
 # Tool calls render as **<tool-name>** at the head of the event content.
 TOOL_NAME_RE = re.compile(r"^\*\*(.+?)\*\*")
 # Verbs that open an investigation, and those that close one.
@@ -363,7 +370,12 @@ class Collector:
         entries_dir = tasks_dir / "taskentries"
 
         by_id = {}
-        if isinstance(index, dict) and isinstance(index.get("tasks"), list):
+        # A readable index is what separates "no tasks yet" from "could not read
+        # the tasks". Conflating those is exactly what the coverage model exists
+        # to prevent, so the distinction is tracked rather than inferred from
+        # whether any records happened to load.
+        index_readable = isinstance(index, dict) and isinstance(index.get("tasks"), list)
+        if index_readable:
             coverage.ok("tasks.index", tasks_dir / "index.json")
             for row in index["tasks"]:
                 if not isinstance(row, dict):
@@ -409,6 +421,22 @@ class Collector:
             coverage.missing("tasks.entries", entries_dir)
 
         if not by_id:
+            if index_readable:
+                # Present and genuinely empty: a brand-new project with no task
+                # graph yet. Not a degraded read.
+                coverage.ok("tasks", tasks_dir, "no tasks defined yet")
+                return {
+                    "available": True,
+                    "tasks": [],
+                    "totals": {
+                        "leafTotal": 0, "leafApproved": 0, "leafAwaitingReview": 0,
+                        "allTotal": 0, "executing": 0, "ready": 0, "blocked": 0,
+                        "attention": 0,
+                    },
+                    "workFront": {"executing": [], "ready": [], "blocked": []},
+                    "attention": [], "awaitingReview": [],
+                    "registrationFailures": [], "unresolvedDependencies": [],
+                }
             coverage.partial("tasks", tasks_dir, "no task records could be read")
             return {"available": False, "tasks": [], "totals": {}}
 
@@ -738,91 +766,195 @@ class Collector:
     # -- clio -----------------------------------------------------------
 
     def collect_clio(self, engines, agents, coverage):
-        """Observed CLIO activity. A floor, never a ceiling.
+        """CLIO investigations: how many started, how far they got, and whether
+        they finished.
 
-        Tool names are read from the `**<tool>**` head of ActionProposed
-        events rather than by scanning raw lines, so file paths that merely
-        contain "clio" are not miscounted as invocations.
+        Tool-call tallies are deliberately NOT surfaced. "67 of 70 calls were
+        clio-wait" says nothing about the work; a wait loop is polling, not
+        progress. What matters is the set of investigations and their state.
+
+        Run state comes from the CLIO run store (`~/.copilot/science-runs/`),
+        which records `state`, `parent_run_id`, `depth`, `tool_calls`, `steers`
+        and `last_activity` per run. That store is MACHINE-WIDE and shared by
+        every project on this box, so runs are admitted only on workspace-scoped
+        evidence:
+
+          - the run id was observed in this workspace's own engine exhaust, or
+          - the run's recorded goal names this workspace as its repository.
+
+        Anything else belongs to another project and is excluded. Tool-call
+        scanning is still used, but only to discover which run ids belong here.
         """
-        tool_calls = {}
-        opened = closed = 0
-        scanned = 0
-        truncated_any = False
+        observed_ids, verbs_seen, scanned, truncated_any = self._scan_clio_calls()
 
-        runs_dir = self.discovery / "engine-runs"
-        if runs_dir.is_dir():
-            for definition_dir in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
-                for instance_dir in sorted(p for p in definition_dir.iterdir() if p.is_dir()):
-                    output = instance_dir / "output.jsonl"
-                    if not output.exists():
-                        continue
-                    scanned += 1
-                    lines, truncated = _tail_lines(output)
-                    truncated_any = truncated_any or truncated
-                    for line in lines:
-                        if "clio" not in line.lower() and "autop" not in line.lower():
-                            continue
-                        try:
-                            record = json.loads(line)
-                        except json.JSONDecodeError:
-                            continue
-                        # Count proposals only; ActionApplied echoes the same
-                        # name and would double every call.
-                        if _norm_status(record.get("kind")) != "actionproposed":
-                            continue
-                        name = _tool_name(record.get("content"))
-                        if not name:
-                            continue
-                        verb = _clio_verb(name)
-                        if verb:
-                            key = "clio-%s" % verb
-                            tool_calls[key] = tool_calls.get(key, 0) + 1
-                            if verb in CLIO_OPEN_VERBS:
-                                opened += 1
-                            elif verb in CLIO_CLOSE_VERBS:
-                                closed += 1
-                        elif CLIO_TOOL_RE.search(name):
-                            key = name.lower()
-                            tool_calls[key] = tool_calls.get(key, 0) + 1
-
+        runs, store_state = self._read_science_runs(observed_ids, coverage)
         plugin_agents = [a for a in agents if a.get("usesClioPlugin")]
+
         if truncated_any:
             coverage.partial(
                 "clio",
-                runs_dir,
-                "log tails bounded to %d KiB; earlier calls are outside coverage"
+                self.discovery / "engine-runs",
+                "engine log tails are bounded to %d KiB, so an investigation whose "
+                "start call scrolled out of the window is only found if its recorded "
+                "goal names this workspace. Run STATE itself is read from the run "
+                "store and is not affected by this bound."
                 % (TAIL_BYTES // 1024),
             )
         elif scanned:
-            coverage.ok("clio", runs_dir, "%d output log(s) scanned" % scanned)
+            coverage.ok("clio", self.discovery / "engine-runs",
+                        "%d output log(s) scanned" % scanned)
         else:
-            coverage.missing("clio", runs_dir)
+            coverage.missing("clio", self.discovery / "engine-runs")
 
-        # Open-minus-closed is an estimate from a bounded window. If the window
-        # clipped the opening call, this can read low or negative; it is
-        # clamped and labelled rather than presented as a count.
-        outstanding = max(0, opened - closed)
+        by_state = {}
+        for run in runs:
+            by_state[run["state"]] = by_state.get(run["state"], 0) + 1
 
         return {
-            "available": scanned > 0 or bool(plugin_agents),
-            "observedToolCalls": sorted(
-                ({"tool": k, "count": v} for k, v in tool_calls.items()),
-                key=lambda r: -r["count"],
-            ),
-            "observedTotal": sum(tool_calls.values()),
-            "investigationsOpened": opened,
-            "investigationsClosed": closed,
-            "investigationsOutstanding": outstanding,
-            "investigationsEstimated": truncated_any,
+            "available": bool(runs) or scanned > 0 or bool(plugin_agents),
+            "investigations": runs,
+            "counts": {
+                "total": len(runs),
+                "running": by_state.get("running", 0),
+                "done": by_state.get("done", 0),
+                "stopped": by_state.get("stopped", 0),
+                "unknown": by_state.get("unknown", 0),
+                "topLevel": sum(1 for r in runs if not r.get("parentRunId")),
+                "subagentRuns": sum(1 for r in runs if r.get("parentRunId")),
+            },
+            "runStore": store_state,
+            "verbsObserved": sorted(verbs_seen),
             "pluginAgents": len(plugin_agents),
             "logsTruncated": truncated_any,
             "caveat": (
-                "Observed structured tool calls only, within bounded log tails. "
-                "Direct editor invocations and subagents can be invisible. "
-                "Zero observed does not mean CLIO was never used. Outstanding "
-                "investigations are opened-minus-closed within the scanned "
-                "window, not a verified live count."
+                "Investigations are scoped to this workspace: a run is listed only "
+                "if its id appears in this workspace's engine exhaust or its recorded "
+                "goal names this workspace. State is what the run recorded for itself; "
+                "a run killed without updating its store still reads as running, which "
+                "is why a missing process is called out separately. Direct editor "
+                "invocations can be invisible, so zero is not proof CLIO was unused."
             ),
+        }
+
+    def _scan_clio_calls(self):
+        """Find CLIO run ids referenced in this workspace's engine exhaust.
+
+        Only used for scoping. Call counts are not reported: a `clio-wait`
+        tally measures polling frequency, not investigation progress.
+        """
+        observed_ids, verbs = set(), set()
+        scanned, truncated_any = 0, False
+
+        runs_dir = self.discovery / "engine-runs"
+        if not runs_dir.is_dir():
+            return observed_ids, verbs, scanned, truncated_any
+
+        for definition_dir in sorted(p for p in runs_dir.iterdir() if p.is_dir()):
+            for instance_dir in sorted(p for p in definition_dir.iterdir() if p.is_dir()):
+                output = instance_dir / "output.jsonl"
+                if not output.exists():
+                    continue
+                scanned += 1
+                lines, truncated = _tail_lines(output)
+                truncated_any = truncated_any or truncated
+                for line in lines:
+                    low = line.lower()
+                    if "clio" not in low and "autop" not in low and "run_id" not in low:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    content = record.get("content")
+                    if not isinstance(content, str):
+                        continue
+                    name = _tool_name(content)
+                    verb = _clio_verb(name) if name else None
+                    if verb:
+                        verbs.add(verb)
+                    # run ids appear in call inputs and in clio-start's output
+                    if verb or CLIO_TOOL_RE.search(name or ""):
+                        observed_ids.update(RUN_ID_RE.findall(content))
+        return observed_ids, verbs, scanned, truncated_any
+
+    def _read_science_runs(self, observed_ids, coverage):
+        """Read the CLIO run store, admitting only workspace-scoped runs."""
+        store = Path(
+            os.environ.get("COPILOT_SCIENCE_RUNS")
+            or (Path.home() / ".copilot" / "science-runs")
+        )
+        if not store.is_dir():
+            coverage.missing("clio.runs", store,
+                             "no CLIO run store; investigation state unavailable")
+            return [], "missing"
+
+        runs, admitted, total = [], 0, 0
+        for path in sorted(store.glob("*.json")):
+            record = _read_json(path)
+            if not isinstance(record, dict) or not record.get("run_id"):
+                continue
+            total += 1
+            run_id = str(record["run_id"])
+            goal = record.get("goal") or ""
+            in_exhaust = run_id in observed_ids
+            names_workspace = self._goal_names_workspace(goal)
+            if not (in_exhaust or names_workspace):
+                continue
+            admitted += 1
+            runs.append(self._science_run_record(record, run_id, goal,
+                                                 in_exhaust, names_workspace))
+
+        coverage.ok("clio.runs", store,
+                    "%d of %d run(s) scoped to this workspace" % (admitted, total))
+        runs.sort(key=lambda r: r.get("startedAt") or "", reverse=True)
+        return runs, "ok"
+
+    def _goal_names_workspace(self, goal):
+        """True when a CLIO goal's "Repository:" header is this workspace.
+
+        Compared as resolved paths rather than by substring. Substring matching
+        is wrong twice over: a symlinked temp dir (/var vs /private/var) fails
+        to match a path that is in fact the same, and a parent directory would
+        match every project nested beneath it.
+        """
+        match = REPO_HEADER_RE.search(goal or "")
+        if not match:
+            return False
+        try:
+            candidate = Path(match.group(1).strip()).resolve()
+        except (OSError, ValueError):
+            return False
+        return candidate == self.root
+
+    def _science_run_record(self, record, run_id, goal, in_exhaust, names_workspace):
+        state = _norm_status(record.get("state")) or "unknown"
+        if state not in ("running", "done", "stopped"):
+            state = state or "unknown"
+
+        # A run that recorded itself as running but whose process is gone died
+        # without updating its store. Reported separately rather than silently
+        # rewritten, because the store is the run's own account of itself.
+        pid = record.get("pid")
+        process_missing = False
+        if state == "running" and pid:
+            process_missing = _process_start_epoch(pid) is None
+
+        return {
+            "runId": run_id,
+            "parentRunId": record.get("parent_run_id"),
+            "depth": record.get("depth") or 0,
+            "state": state,
+            "processMissing": process_missing,
+            # First line of the goal is the most legible summary available.
+            "goal": _first_meaningful_line(goal),
+            "startedAt": _normalize_run_time(record.get("started")),
+            "updatedAt": _normalize_run_time(record.get("updated")),
+            "toolCalls": record.get("tool_calls"),
+            "steers": record.get("steers"),
+            "subagents": record.get("subagents"),
+            "lastTool": record.get("last_tool"),
+            "lastActivity": record.get("last_activity"),
+            "scopedBy": "exhaust" if in_exhaust else "goal",
         }
 
     # -- live log -------------------------------------------------------
@@ -1049,9 +1181,82 @@ class Collector:
                         "error": entry.get("error"),
                     }
                 )
+        shelves = self._collect_shelves(shelf_dir, coverage)
+        documents = sum(s["documentsOnDisk"] for s in shelves)
         coverage.ok("bookshelf", shelf_dir,
-                    "%d source(s), %d failed" % (len(sources), failures))
-        return {"available": True, "sources": sources, "failed": failures}
+                    "%d shelf(s), %d document(s), %d ingest source(s), %d failed"
+                    % (len(shelves), documents, len(sources), failures))
+        return {"available": True, "shelves": shelves, "documents": documents,
+                "sources": sources, "failed": failures}
+
+    def _collect_shelves(self, shelf_dir, coverage):
+        """Shelves from shelves.json (0.15.15+), counted from provider stores.
+
+        Documents are counted from `<provider>/<shelfId>/documents/*.meta.json`
+        on disk; `index/index-meta.json` is what the indexer last reported.
+        The two are shown side by side, never merged. Only allowlisted meta
+        fields are read — document bodies are never opened.
+        """
+        shelves_path = shelf_dir / "shelves.json"
+        if not shelves_path.exists():
+            coverage.missing("bookshelf.shelves", shelves_path)
+            return []
+        data = _read_json(shelves_path, coverage, "bookshelf.shelves")
+        entries = data.get("shelves") if isinstance(data, dict) else None
+        if not isinstance(entries, list):
+            if data is not None:
+                coverage.error("bookshelf.shelves", shelves_path, "no shelves list")
+            return []
+
+        shelves = []
+        for entry in entries:
+            if not isinstance(entry, dict) or not entry.get("shelfId"):
+                continue
+            shelf_id = str(entry["shelfId"])
+            configs = [c for c in entry.get("providerConfigs") or [] if isinstance(c, dict)]
+            kind = next((str((c.get("metadata") or {}).get("kind"))
+                         for c in configs if (c.get("metadata") or {}).get("kind")), None)
+            on_disk, indexed, last_indexed, docs = 0, None, None, []
+            for config in configs:
+                provider = str(config.get("providerId") or config.get("providerType") or "")
+                # Ids come from the workspace's own manifest; refuse traversal.
+                if not provider or "/" in provider or ".." in provider \
+                        or "/" in shelf_id or ".." in shelf_id:
+                    continue
+                store = shelf_dir / "providers" / provider / shelf_id
+                doc_dir = store / "documents"
+                if doc_dir.is_dir():
+                    for meta_path in sorted(doc_dir.glob("*.meta.json")):
+                        on_disk += 1
+                        if len(docs) >= 40:
+                            continue
+                        meta = _read_json(meta_path)
+                        if isinstance(meta, dict):
+                            docs.append({
+                                "title": meta.get("title") or meta.get("sourceId"),
+                                "sourceRef": meta.get("sourceRef"),
+                                "writtenAt": meta.get("writtenAt"),
+                            })
+                index_meta = _read_json(store / "index" / "index-meta.json")
+                if isinstance(index_meta, dict):
+                    if isinstance(index_meta.get("documentCount"), int):
+                        indexed = (indexed or 0) + index_meta["documentCount"]
+                    last_indexed = max(filter(None, [last_indexed,
+                                                     index_meta.get("lastIndexedAt")]),
+                                       default=None)
+            shelves.append({
+                "shelfId": shelf_id,
+                "name": entry.get("name") or shelf_id,
+                "description": entry.get("description"),
+                "kind": kind,
+                "providers": [c.get("providerId") for c in configs],
+                "documentsOnDisk": on_disk,
+                "indexedDocuments": indexed,
+                "lastIndexedAt": last_indexed,
+                "documents": docs,
+            })
+        coverage.ok("bookshelf.shelves", shelves_path, "%d shelf(s)" % len(shelves))
+        return shelves
 
     # -- snapshot --------------------------------------------------------
 
@@ -1198,6 +1403,43 @@ def _clio_verb(tool_name):
     return verb if verb in CLIO_VERBS else None
 
 
+def _first_meaningful_line(text):
+    """The human-readable part of a CLIO goal.
+
+    Goals open with a "Repository: <path> (<note>)" header. That header is
+    scoping metadata, not a description, and it is NOT always on its own line —
+    it is frequently the start of the same sentence as the real goal. Dropping
+    the whole line therefore discards the description, so the prefix is removed
+    instead.
+    """
+    if not isinstance(text, str):
+        return None
+    cleaned = GOAL_PREFIX_RE.sub("", text, count=1)
+    for line in cleaned.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.lower().startswith("context:"):
+            line = line[len("context:"):].strip()
+            if not line:
+                continue
+        return line[:240]
+    return None
+
+
+def _normalize_run_time(value):
+    """CLIO records 'YYYY-MM-DD HH:MM:SSZ'; convert to ISO 8601 for the UI."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    text = value.strip()
+    for fmt in ("%Y-%m-%d %H:%M:%SZ", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc).isoformat()
+        except ValueError:
+            continue
+    return _iso(_parse_iso(text))
+
+
 def collect(workspace="."):
     return Collector(workspace).snapshot()
 
@@ -1233,12 +1475,19 @@ def summarize(snapshot):
         )
     clio = snapshot["clio"]
     if clio.get("available"):
+        counts = clio.get("counts", {})
         lines.append(
-            "  clio: %d observed call(s), %d investigation(s) outstanding%s, %d plugin agent(s)"
-            % (clio.get("observedTotal", 0), clio.get("investigationsOutstanding", 0),
-               " (estimated)" if clio.get("investigationsEstimated") else "",
-               clio.get("pluginAgents", 0))
+            "  clio: %d investigation(s) — %d running, %d done, %d stopped"
+            % (counts.get("total", 0), counts.get("running", 0),
+               counts.get("done", 0), counts.get("stopped", 0))
         )
+        for run in clio.get("investigations", [])[:5]:
+            flag = " [process missing]" if run.get("processMissing") else ""
+            lines.append(
+                "    %-12s %-8s %s%s"
+                % (run.get("runId"), run.get("state"),
+                   (run.get("lastActivity") or run.get("goal") or "")[:60], flag)
+            )
     degraded = snapshot["coverage"]["degraded"]
     if degraded:
         lines.append("  COVERAGE GAPS (%d):" % len(degraded))
