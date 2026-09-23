@@ -27,6 +27,23 @@ jobs:
           find skills -name '*.py' -print0 | xargs -0 -r python3 -m py_compile
           echo "all skill scripts compile"
 
+      - name: Assert generated single-file runtimes are current
+        run: |
+          for b in skills/*/scripts/build.py; do
+            [ -f "$b" ] || continue
+            echo "checking $b"
+            (cd "$(dirname "$(dirname "$b")")" && python3 scripts/build.py --check)
+          done
+
+      - name: Run skill test suites
+        run: |
+          for t in skills/*/scripts/test_*.py; do
+            [ -f "$t" ] || continue
+            echo "running $t"
+            (cd "$(dirname "$(dirname "$t")")" \
+              && python3 -m unittest discover -s scripts -p "$(basename "$t")")
+          done
+
       - name: Assert no generated artifacts are tracked
         run: |
           if git ls-files | grep -E 'token_usage_mined\.json|token-usage-report.*\.md'; then

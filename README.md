@@ -26,6 +26,7 @@ component layout. No symlinks, no duplication, no build step.
 | [`discovery-add-agents`](skills/discovery-add-agents) | 1.16.0 | Adds agents from the public `microsoft/discovery` repo to a workspace, then deploys each to one target: the local Copilot app as `.agent.md` companions, a Microsoft Discovery project + Azure via `UpsertAgent`, or promoting an already-local agent up to Discovery. |
 | [`discovery-design-tasks`](skills/discovery-design-tasks) | 1 | Generates a Microsoft Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
 | [`osti-literature-search`](skills/osti-literature-search) | 1 | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
+| [`discovery-dashboard`](skills/discovery-dashboard) | 1 | Read-only live operations dashboard for a Discovery workspace: leaf-task progress with approved vs awaiting-review kept separate, the executing/ready/blocked work front, engine liveness verified against real process identity, agent runs deduplicated via an alias graph, observed CLIO investigations, and an explicit coverage panel. Never writes to the workspace. |
 
 ### External tools
 

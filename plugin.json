@@ -1,7 +1,7 @@
 {
   "name": "discovery-tools",
-  "version": "0.4.0",
-  "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Covers Discovery agent deployment and investigation task design, workspace token-usage mining, arxiv-ready paper builds, and DOE literature retrieval.",
+  "version": "0.5.0",
+  "description": "Agents, skills, and starter kits for Microsoft Discovery \u2014 the AI for Science platform. Covers Discovery agent deployment and investigation task design, workspace token-usage mining, live project status dashboards, arxiv-ready paper builds, and DOE literature retrieval.",
   "author": {
     "name": "Tim Meyers",
     "url": "https://github.com/timothymeyers"
@@ -25,7 +25,12 @@
     "literature-search",
     "discovery-agents",
     "foundry",
-    "investigation-tasks"
+    "investigation-tasks",
+    "dashboard",
+    "observability-dashboard",
+    "project-status",
+    "engine-liveness",
+    "clio"
   ],
   "skills": [
     "skills/"

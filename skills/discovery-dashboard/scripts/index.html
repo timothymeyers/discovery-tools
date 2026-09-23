@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Discovery — Live Operations</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #161a21; --panel2: #1c212a; --line: #262d39;
+    --fg: #e6e9ef; --dim: #939cad; --faint: #6b7385;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --info: #58a6ff;
+    --accent: #a371f7; --unknown: #6b7385;
+  }
+  html[data-theme="light"] {
+    --bg: #f6f7f9; --panel: #ffffff; --panel2: #f0f2f5; --line: #d8dee6;
+    --fg: #1c2128; --dim: #57606a; --faint: #848d97;
+    --ok: #1a7f37; --warn: #9a6700; --bad: #cf222e; --info: #0969da;
+    --accent: #8250df; --unknown: #848d97;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  header {
+    position: sticky; top: 0; z-index: 10; background: var(--panel);
+    border-bottom: 1px solid var(--line); padding: 10px 18px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .01em; }
+  header .ws { color: var(--dim); font-size: 12px; }
+  header .spacer { flex: 1; }
+  header select, header button {
+    background: var(--panel2); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 9px; font-size: 12px; cursor: pointer;
+  }
+  .tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 5px 13px; border-radius: 6px; cursor: pointer; font-size: 13px;
+    border: 1px solid transparent; color: var(--dim);
+  }
+  .tab.active { background: var(--panel2); border-color: var(--line); color: var(--fg); }
+
+  #status {
+    font-size: 12px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); white-space: nowrap;
+  }
+  #status.stale { color: var(--warn); border-color: var(--warn); }
+  #status.error { color: var(--bad); border-color: var(--bad); }
+
+  main { padding: 18px; max-width: 1560px; margin: 0 auto; }
+  .grid { display: grid; gap: 14px; }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden;
+  }
+  .panel > h2 {
+    margin: 0; font-size: 12px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--dim);
+    padding: 10px 14px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .panel > h2 .count { color: var(--faint); font-weight: 400; letter-spacing: 0; }
+  .panel .body { padding: 12px 14px; }
+  details.panel > summary {
+    list-style: none; cursor: pointer; margin: 0; font-size: 12px; font-weight: 600;
+    letter-spacing: .07em; text-transform: uppercase; color: var(--dim);
+    padding: 10px 14px; display: flex; align-items: center; gap: 8px;
+  }
+  details.panel > summary::-webkit-details-marker { display: none; }
+  details.panel > summary::before { content: "▸"; color: var(--faint); }
+  details.panel[open] > summary::before { content: "▾"; }
+  details.panel[open] > summary { border-bottom: 1px solid var(--line); }
+
+  /* hero */
+  .hero { display: flex; gap: 26px; align-items: center; flex-wrap: wrap; }
+  .bigbar { flex: 1 1 380px; min-width: 300px; }
+  .bar {
+    height: 22px; border-radius: 6px; background: var(--panel2);
+    overflow: hidden; display: flex; border: 1px solid var(--line);
+  }
+  .bar .seg { height: 100%; }
+  .seg.approved { background: var(--ok); }
+  .seg.awaiting { background: var(--warn); }
+  .legend { display: flex; gap: 16px; margin-top: 9px; font-size: 12px; flex-wrap: wrap; }
+  .legend .k { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .legend b { color: var(--fg); }
+
+  .tiles { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tile {
+    background: var(--panel2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 9px 14px; min-width: 96px;
+  }
+  .tile .n { font-size: 21px; font-weight: 650; line-height: 1.15; }
+  .tile .l {
+    font-size: 10.5px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .05em; margin-top: 1px;
+  }
+  .tile.bad .n { color: var(--bad); } .tile.warn .n { color: var(--warn); }
+  .tile.ok .n { color: var(--ok); }  .tile.info .n { color: var(--info); }
+
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li {
+    padding: 7px 0; border-bottom: 1px solid var(--line);
+    display: flex; gap: 9px; align-items: baseline;
+  }
+  ul.list li:last-child { border-bottom: 0; }
+  .dx {
+    color: var(--accent); font-size: 12px; flex: 0 0 auto;
+    font-family: ui-monospace, Menlo, monospace;
+  }
+  .ttl { flex: 1; min-width: 0; }
+  .sub { color: var(--faint); font-size: 11.5px; }
+
+  .pill {
+    font-size: 10.5px; padding: 1.5px 7px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--dim); white-space: nowrap;
+  }
+  .pill.running { color: var(--ok); border-color: var(--ok); }
+  .pill.finished { color: var(--info); border-color: var(--info); }
+  .pill.stopped { color: var(--bad); border-color: var(--bad); }
+  .pill.unknown { color: var(--unknown); border-color: var(--unknown); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+
+  .empty { color: var(--faint); font-size: 12.5px; font-style: italic; }
+  .note {
+    color: var(--faint); font-size: 11.5px; margin-top: 10px;
+    border-top: 1px dashed var(--line); padding-top: 9px;
+  }
+
+  .log { max-height: 420px; overflow: auto; }
+  .log .row {
+    display: flex; gap: 9px; padding: 4px 0;
+    border-bottom: 1px solid var(--line); font-size: 12px;
+  }
+  .log .t {
+    flex: 0 0 60px; font-family: ui-monospace, Menlo, monospace;
+    font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  }
+  .t.ACTION { color: var(--ok); } .t.PROPOSE { color: var(--info); }
+  .t.OBSERVE { color: var(--dim); } .t.DONE { color: var(--accent); }
+  .t.ERROR { color: var(--bad); }
+  .log .msg {
+    flex: 1; min-width: 0; white-space: pre-wrap; word-break: break-word;
+    color: var(--dim); max-height: 3.1em; overflow: hidden;
+  }
+  .log .when { flex: 0 0 auto; color: var(--faint); font-size: 10.5px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th {
+    text-align: left; color: var(--dim); font-weight: 500; font-size: 11px;
+    text-transform: uppercase; letter-spacing: .05em;
+    padding: 5px 8px 5px 0; border-bottom: 1px solid var(--line);
+  }
+  td { padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+
+  .cov { display: flex; gap: 8px; align-items: baseline; padding: 5px 0; font-size: 12px; }
+  .cov .s { flex: 0 0 62px; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+  .s.ok { color: var(--ok); } .s.missing { color: var(--faint); }
+  .s.error { color: var(--bad); } .s.partial { color: var(--warn); }
+  footer { padding: 20px 18px 40px; color: var(--faint); font-size: 11.5px;
+           max-width: 1560px; margin: 0 auto; }
+  footer h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+              color: var(--dim); margin: 0 0 7px; }
+  footer ul { margin: 0; padding-left: 17px; } footer li { margin: 3px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Discovery</h1>
+  <span class="ws" id="ws">—</span>
+  <div class="tabs">
+    <div class="tab active" data-tab="overview">Overview</div>
+    <div class="tab" data-tab="diagnostics">Diagnostics</div>
+  </div>
+  <span class="spacer"></span>
+  <span id="status">connecting…</span>
+  <select id="interval" title="Auto-refresh interval">
+    <option value="0">paused</option>
+    <option value="5000" selected>5s</option>
+    <option value="15000">15s</option>
+    <option value="60000">60s</option>
+  </select>
+  <button id="refresh">Refresh</button>
+  <button id="theme">◐</button>
+</header>
+
+<main>
+  <section id="overview"></section>
+  <section id="diagnostics" style="display:none"></section>
+</main>
+
+<footer id="methodology"></footer>
+
+<script>
+/*__STATIC_SNAPSHOT__*/
+const STATIC = window.__STATIC_SNAPSHOT__ || null;
+
+let snap = null, timer = null, failures = 0;
+
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function ago(iso) {
+  if (!iso) return "";
+  const t = Date.parse(iso);
+  if (isNaN(t)) return "";
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return Math.floor(s) + "s ago";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+
+function tile(n, label, cls) {
+  return `<div class="tile ${cls || ""}"><div class="n">${esc(n)}</div>
+          <div class="l">${esc(label)}</div></div>`;
+}
+function panel(title, count, inner, extra) {
+  return `<div class="panel"><h2>${esc(title)}${
+    count != null ? ` <span class="count">${esc(count)}</span>` : ""}</h2>
+    <div class="body">${inner}${extra ? `<div class="note">${extra}</div>` : ""}</div></div>`;
+}
+function collapsed(title, count, inner, extra) {
+  return `<details class="panel"><summary>${esc(title)}${
+    count != null ? ` <span class="count">${esc(count)}</span>` : ""}</summary>
+    <div class="body">${inner}${extra ? `<div class="note">${extra}</div>` : ""}</div></details>`;
+}
+const empty = m => `<div class="empty">${esc(m)}</div>`;
+
+function taskList(items, opts = {}) {
+  if (!items || !items.length) return empty(opts.emptyText || "Nothing here.");
+  return `<ul class="list">` + items.map(t => {
+    let sub = "";
+    if (opts.showBlockers && t.blockedBy && t.blockedBy.length) {
+      sub = `<div class="sub">waiting on ` + t.blockedBy.map(b =>
+        `${esc(b.dxId || (b.taskId || "").slice(0, 8))}<span class="pill ${
+          b.status === "unresolved" ? "warn" : ""}">${esc(b.status)}</span>`
+      ).join(", ") + `</div>`;
+    } else if (opts.showStatus) {
+      sub = `<div class="sub">${esc(t.status || "")}${
+        t.updatedAt ? " · " + ago(t.updatedAt) : ""}</div>`;
+    }
+    return `<li><span class="dx">${esc(t.dxId || "")}</span>
+      <span class="ttl">${esc(t.title || t.taskId || "")}${sub}</span></li>`;
+  }).join("") + `</ul>`;
+}
+
+/* ---------------- Overview ---------------- */
+
+function renderOverview(s) {
+  const out = [];
+  const T = s.tasks || {}, totals = T.totals || {}, A = s.alerts || {},
+        C = A.counts || {};
+
+  // Hero. Approved and awaiting review are DISTINCT segments and are never
+  // summed into one "done" number.
+  const leaf = totals.leafTotal || 0;
+  const app = totals.leafApproved || 0, awa = totals.leafAwaitingReview || 0;
+  const pA = leaf ? (app / leaf * 100) : 0, pW = leaf ? (awa / leaf * 100) : 0;
+  out.push(panel("Progress", leaf ? `${app} of ${leaf} leaf tasks approved` : null,
+    T.available ? `<div class="hero">
+      <div class="bigbar">
+        <div class="bar">
+          <div class="seg approved" style="width:${pA.toFixed(2)}%"></div>
+          <div class="seg awaiting" style="width:${pW.toFixed(2)}%"></div>
+        </div>
+        <div class="legend">
+          <span class="k"><span class="sw" style="background:var(--ok)"></span>
+            <b>${app}</b> approved complete</span>
+          <span class="k"><span class="sw" style="background:var(--warn)"></span>
+            <b>${awa}</b> awaiting review</span>
+          <span class="k"><span class="sw" style="background:var(--panel2)"></span>
+            <b>${Math.max(0, leaf - app - awa)}</b> not done</span>
+        </div>
+      </div>
+      <div class="tiles">
+        ${tile(totals.executing || 0, "executing", "info")}
+        ${tile(totals.ready || 0, "ready", "ok")}
+        ${tile(totals.blocked || 0, "blocked", (totals.blocked ? "warn" : ""))}
+        ${tile(C.actionNeeded || 0, "action now", (C.actionNeeded ? "bad" : ""))}
+      </div></div>`
+      : empty("No task data in this workspace."),
+    `Denominator is leaf tasks only, so parents and children are not both counted.
+     <b>Awaiting review</b> means <code>executionDone</code> — it is not approval,
+     and is never added to approved.`));
+
+  // Alerts, split three ways.
+  const alertCol = (title, items, cls) => `
+    <div class="panel"><h2>${esc(title)} <span class="count">${items.length}</span></h2>
+    <div class="body">${items.length ? `<ul class="list">` + items.slice(0, 14).map(i =>
+      `<li><span class="ttl">${esc(i.label)}<div class="sub">${esc(i.detail)}</div></span></li>`
+    ).join("") + `</ul>` : empty("None.")}</div></div>`;
+  out.push(`<div class="grid g3" style="margin-top:14px">
+    ${alertCol("Action needed now", A.actionNeeded || [])}
+    ${alertCol("Blocked by dependencies", A.blocked || [])}
+    ${alertCol("Awaiting review", A.awaitingReview || [])}
+  </div>`);
+
+  // Work front.
+  const W = T.workFront || {};
+  out.push(`<div class="grid g3" style="margin-top:14px">
+    ${panel("Executing", (W.executing || []).length,
+      taskList(W.executing, { showStatus: true, emptyText: "Nothing executing." }))}
+    ${panel("Ready", (W.ready || []).length,
+      taskList(W.ready, { emptyText: "Nothing ready." }))}
+    ${panel("Blocked", (W.blocked || []).length,
+      taskList(W.blocked, { showBlockers: true, emptyText: "Nothing blocked." }),
+      `Blockers are derived from current <code>dependsOn</code> edges. A dependency that
+       cannot be resolved stays a blocker rather than being assumed satisfied.`)}
+  </div>`);
+
+  // Engines.
+  const engines = (s.engines && s.engines.engines) || [];
+  const live = engines.filter(e => e.liveness === "running").length;
+  const unknown = engines.filter(e => e.liveness === "unknown").length;
+  const engineRows = engines.length ? `<table><thead><tr>
+      <th>Engine</th><th>State</th><th>Adapter</th><th>Started</th><th>Basis</th>
+    </tr></thead><tbody>` + engines.slice(0, 12).map(e => `<tr>
+      <td>${esc(e.definitionId || "")}<div class="sub mono">${
+        esc((e.instanceId || "").slice(0, 12))}</div></td>
+      <td><span class="pill ${esc(e.liveness)}">${esc(e.liveness)}</span></td>
+      <td class="sub">${esc(e.adapterKind || "")}</td>
+      <td class="sub">${esc(ago(e.startedAt))}</td>
+      <td class="sub">${esc(e.livenessBasis || "")}</td>
+    </tr>`).join("") + `</tbody></table>`
+    : empty("No engine runs recorded.");
+
+  // Agents.
+  const agents = (s.agents && s.agents.agents) || [];
+  const activeAgents = agents.filter(a => !a.completedAt);
+  const regFails = agents.filter(a => a.registrationFailure);
+  const K = s.clio || {};
+
+  out.push(`<div class="grid g2" style="margin-top:14px">
+    ${panel("Engines", `${live} running · ${unknown} unknown · ${engines.length} total`,
+      engineRows,
+      `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
+       not be verified against its recorded start time. Age is never used to infer a stall.`)}
+    ${panel("Agents & CLIO", `${agents.length} run(s)`, `
+      <div class="tiles" style="margin-bottom:10px">
+        ${tile(activeAgents.length, "no completedAt", activeAgents.length ? "info" : "")}
+        ${tile(regFails.length, "never started", regFails.length ? "bad" : "")}
+        ${tile(K.observedTotal || 0, "clio calls")}
+        ${tile(K.investigationsOutstanding || 0, "investigations",
+               K.investigationsOutstanding ? "info" : "")}
+      </div>
+      ${agents.length ? `<ul class="list">` + agents.slice(0, 8).map(a =>
+        `<li><span class="ttl">${esc(a.agentId || a.key)}
+          <div class="sub">${esc(a.status || "")}${
+            a.taskId ? " · " + esc(a.taskId) : ""}${
+            a.aliasCount > 1 ? ` · ${a.aliasCount} ids` : ""}</div></span>
+          ${a.registrationFailure ? `<span class="pill stopped">never started</span>` : ""}
+        </li>`).join("") + `</ul>` : empty("No agent runs found.")}`,
+      `${esc(K.caveat || "")}`)}
+  </div>`);
+
+  return out.join("");
+}
+
+/* ---------------- Diagnostics ---------------- */
+
+function renderDiagnostics(s) {
+  const out = [];
+  const ev = (s.events && s.events.events) || [];
+  out.push(collapsed("Live log", `${ev.length} event(s)`,
+    ev.length ? `<div class="log">` + ev.map(e => `<div class="row">
+        <span class="t ${esc(e.type)}">${esc(e.type)}</span>
+        <span class="msg">${esc(e.text)}</span>
+        <span class="when">${e.timestamp ? esc(ago(e.timestamp)) : "no timestamp"}</span>
+      </div>`).join("") + `</div>` : empty("No engine events in the scanned window."),
+    `Thinking events are omitted as noise. Events without a timestamp stay
+     untimestamped rather than borrowing the log file's write time.`));
+
+  const g = s.git || {};
+  const commits = g.commits || [];
+  out.push(collapsed("Git activity", `${commits.length} commit(s)`,
+    commits.length ? `<table><thead><tr>
+        <th>Commit</th><th>Subject</th><th>DX</th><th>Churn</th><th>When</th>
+      </tr></thead><tbody>` + commits.map(c => `<tr>
+        <td class="mono sub">${esc(c.sha)}</td>
+        <td>${esc(c.subject)}</td>
+        <td class="dx">${esc((c.dxRefs || []).join(" "))}</td>
+        <td class="sub">${c.filesChanged} files +${c.insertions}/-${c.deletions}${
+          c.suppressedDiscoveryFiles ?
+            ` <span class="pill">+${c.suppressedDiscoveryFiles} .discovery</span>` : ""}</td>
+        <td class="sub">${esc(ago(c.date))}</td>
+      </tr>`).join("") + `</tbody></table>`
+      : empty(g.available ? "No commits." : "Not a git repository."),
+    `<code>.discovery/</code> churn is excluded from the per-commit counts and shown
+     separately. <code>rebuiltAt</code> timestamps and live log appends mean the working
+     tree is never clean while Discovery runs — that is not project activity.`));
+
+  const P = s.purpose || {};
+  out.push(collapsed("Purpose & outcomes", `${(P.outcomes || []).length} outcome(s)`,
+    (P.purpose && P.purpose.title)
+      ? `<div style="margin-bottom:10px"><b>${esc(P.purpose.title)}</b>
+         <div class="sub">${esc((P.purpose.statement || "").slice(0, 400))}</div></div>` +
+        ((P.outcomes || []).length ? `<ul class="list">` + P.outcomes.map(o =>
+          `<li><span class="ttl">${esc(o.title || "")}<div class="sub">${
+             esc(o.type || "")}${o.taskCount ? ` · ${o.taskCount} task(s)` : ""}</div></span>
+           <span class="pill">${esc(o.status || "—")}</span></li>`
+        ).join("") + `</ul>` : "")
+      : empty("No purpose recorded.")));
+
+  const B = s.bookshelf || {};
+  out.push(collapsed("Bookshelf",
+    B.available ? `${(B.sources || []).length} source(s)${B.failed ? ` · ${B.failed} failed` : ""}`
+                : "absent",
+    (B.sources || []).length ? `<ul class="list">` + B.sources.map(x =>
+      `<li><span class="ttl">${esc(x.name || x.uri || "")}${
+         x.error ? `<div class="sub">${esc(String(x.error).slice(0, 160))}</div>` : ""}</span>
+       <span class="pill ${x.outcome === "indexed" ? "finished" : "warn"}">${
+         esc(x.outcome || x.status || "—")}</span></li>`).join("") + `</ul>`
+      : empty(B.available ? "No ingest state recorded." : "No bookshelf in this workspace.")));
+
+  const cov = (s.coverage && s.coverage.entries) || [];
+  const bad = cov.filter(c => c.state === "error" || c.state === "partial");
+  out.push(collapsed("Coverage & gaps", `${bad.length} degraded / ${cov.length} sources`,
+    cov.length ? cov.map(c => `<div class="cov">
+      <span class="s ${esc(c.state)}">${esc(c.state)}</span>
+      <span><b>${esc(c.source)}</b>${
+        c.detail ? ` <span class="sub">${esc(c.detail)}</span>` : ""}</span>
+    </div>`).join("") : empty("No sources probed."),
+    `<b>missing</b> means the source is not present in this workspace — normal across
+     Discovery versions. <b>error</b> and <b>partial</b> mean the dashboard could not fully
+     read something, which is reported separately from a source that is genuinely empty.`));
+
+  const K = s.clio || {};
+  if ((K.observedToolCalls || []).length) {
+    out.push(collapsed("CLIO tool calls", `${K.observedTotal} observed`,
+      `<table><thead><tr><th>Tool</th><th>Count</th></tr></thead><tbody>` +
+      K.observedToolCalls.map(t =>
+        `<tr><td class="mono">${esc(t.tool)}</td><td>${t.count}</td></tr>`
+      ).join("") + `</tbody></table>`, esc(K.caveat || "")));
+  }
+
+  return `<div class="grid" style="gap:14px">${out.join("")}</div>`;
+}
+
+/* ---------------- methodology ---------------- */
+
+function renderMethodology(s) {
+  return `<h3>How to read these numbers</h3><ul>
+    <li><b>Approved complete</b> counts only <code>complete</code>.
+        <b>Awaiting review</b> counts only <code>executionDone</code> and is not approval.
+        They are never summed.</li>
+    <li>Progress uses <b>leaf tasks only</b>, so a parent and its children are not both counted.</li>
+    <li>A task's modification time is <b>not a heartbeat</b>. Age alone never diagnoses a
+        stalled task, and this dashboard will not claim one is stalled.</li>
+    <li>Engine <code>startedAt</code> and <code>writtenAtUtc</code> are startup metadata.
+        Log file mtime is evidence that a log was written, not that an event occurred.</li>
+    <li>Engine liveness requires the recorded pid to exist <b>and</b> its observed start time
+        to match the record. A matching pid with a different start time is pid reuse and
+        reports <b>unknown</b>. A live shared host does not prove a worker is healthy.</li>
+    <li>Agent runs are deduplicated across an alias graph of every id they are known by, not
+        a single run id.</li>
+    <li>CLIO figures are <b>observed structured tool calls within bounded log tails</b>.
+        Direct invocations and subagents can be invisible; zero observed does not mean CLIO
+        was never used.</li>
+    <li>Blockers come from live <code>dependsOn</code> edges. An unresolvable dependency
+        stays a blocker. Both <code>complete</code> and <code>executionDone</code> satisfy one.</li>
+    <li>Historical errors do not raise current alerts.</li>
+    <li>Sources that could not be read are reported in <b>Coverage &amp; gaps</b>, separately
+        from sources that are genuinely empty.</li>
+  </ul>
+  <div style="margin-top:10px">Snapshot ${esc(s.generatedAt || "")} ·
+    collected in ${esc(s.collectionMs)} ms · schema ${esc(s.schemaVersion)} ·
+    read-only, loopback only.</div>`;
+}
+
+/* ---------------- plumbing ---------------- */
+
+function render() {
+  if (!snap) return;
+  document.getElementById("ws").textContent = snap.workspaceName || snap.workspace || "";
+  document.getElementById("overview").innerHTML = renderOverview(snap);
+  document.getElementById("diagnostics").innerHTML = renderDiagnostics(snap);
+  document.getElementById("methodology").innerHTML = renderMethodology(snap);
+}
+
+function setStatus(text, cls) {
+  const el = document.getElementById("status");
+  el.textContent = text;
+  el.className = cls || "";
+}
+
+async function refresh() {
+  if (STATIC) { snap = STATIC; render(); setStatus("static snapshot"); return; }
+  try {
+    const res = await fetch("/api/snapshot", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    snap = await res.json();
+    failures = 0;
+    render();
+    const age = snap.generatedAt ? (Date.now() - Date.parse(snap.generatedAt)) / 1000 : 0;
+    // Keep the last good view rather than blanking; just say it is stale.
+    setStatus(age > 20 ? `stale · ${Math.round(age)}s old` : `updated ${ago(snap.generatedAt)}`,
+              age > 20 ? "stale" : "");
+  } catch (err) {
+    failures++;
+    setStatus(`disconnected (${failures}) · showing last good snapshot`, "error");
+  }
+}
+
+function schedule() {
+  if (timer) clearInterval(timer);
+  const ms = parseInt(document.getElementById("interval").value, 10);
+  if (ms > 0 && !STATIC) timer = setInterval(refresh, ms);
+}
+
+document.querySelectorAll(".tab").forEach(tab => {
+  tab.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    tab.classList.add("active");
+    const which = tab.dataset.tab;
+    document.getElementById("overview").style.display =
+      which === "overview" ? "" : "none";
+    document.getElementById("diagnostics").style.display =
+      which === "diagnostics" ? "" : "none";
+  });
+});
+
+document.getElementById("refresh").addEventListener("click", refresh);
+document.getElementById("interval").addEventListener("change", schedule);
+document.getElementById("theme").addEventListener("click", () => {
+  const root = document.documentElement;
+  const next = root.getAttribute("data-theme") === "light" ? "dark" : "light";
+  root.setAttribute("data-theme", next);
+  try { localStorage.setItem("dxdash-theme", next); } catch (e) {}
+});
+try {
+  const saved = localStorage.getItem("dxdash-theme");
+  if (saved) document.documentElement.setAttribute("data-theme", saved);
+} catch (e) {}
+
+// Do not poll a hidden tab; resume immediately when it becomes visible again.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { if (timer) clearInterval(timer); timer = null; }
+  else { refresh(); schedule(); }
+});
+
+refresh();
+schedule();
+</script>
+</body>
+</html>
