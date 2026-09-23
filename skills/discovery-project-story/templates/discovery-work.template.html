@@ -1,0 +1,594 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="generator" content="discovery-project-story">
+<meta name="story-version" content="__VERSION__">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>__TITLE__</title>
+<script>
+(() => {
+  const p = new URLSearchParams(location.search).get("theme");
+  const t = p === "light" || p === "dark" ? p : (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = t;
+})();
+</script>
+<style>
+/* Self-contained theme. Override accents via story.theme; nothing is loaded from the network. */
+:root{color-scheme:light;
+  --ps-bg:#f3f4f7;--ps-bg-elevated:#fafbfc;--ps-surface:#ffffff;--ps-border:#d9dde4;--ps-border-strong:#8b93a1;
+  --ps-text:#1b212b;--ps-text-soft:#5a6372;--ps-accent:__ACCENT_LIGHT__;--ps-accent-fg:#ffffff;--ps-accent-soft:color-mix(in srgb,var(--ps-accent) 10%,transparent);
+  --ps-human:#1b212b;--ps-record:#6b7280;--ps-success:#15803d;--ps-warning:#b45309;--ps-link:#1d4ed8;
+  --ps-overlay:rgba(243,244,247,.82);--ps-shadow:0 18px 48px rgba(15,23,42,.12)}
+html[data-theme="dark"]{color-scheme:dark;
+  --ps-bg:#15181d;--ps-bg-elevated:#1c2027;--ps-surface:#22262e;--ps-border:#343a45;--ps-border-strong:#6b7483;
+  --ps-text:#e6e9ee;--ps-text-soft:#a3abb8;--ps-accent:__ACCENT_DARK__;--ps-accent-fg:#10131a;
+  --ps-human:#e6e9ee;--ps-record:#9aa3b1;--ps-success:#4ade80;--ps-warning:#fbbf24;--ps-link:#8ab4ff;
+  --ps-overlay:rgba(21,24,29,.86);--ps-shadow:0 18px 48px rgba(0,0,0,.4)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ps-bg);color:var(--ps-text);font-family:"Segoe UI",Aptos,-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif}
+button,input,select{font:inherit}
+button,select{min-height:32px;padding:4px 10px;border:1px solid var(--ps-border-strong);border-radius:10px;background:var(--ps-surface);color:var(--ps-text);cursor:pointer}
+button:hover{background:var(--ps-accent-soft)}button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--ps-accent);border-color:var(--ps-accent);color:var(--ps-accent-fg);font-weight:700}
+:focus-visible{outline:3px solid var(--ps-accent);outline-offset:2px}input{accent-color:var(--ps-accent)}
+[hidden]{display:none!important}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.app{min-height:100dvh;padding:10px 16px;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;container-type:inline-size}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;min-width:0}
+.eyebrow{margin:0 0 3px;font-size:11px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;color:var(--ps-accent)}
+h1{margin:0;font-size:clamp(21px,2vw,34px);line-height:1.12;letter-spacing:-.02em;overflow-wrap:anywhere}
+.head-meta{text-align:right;font-size:12px;color:var(--ps-text-soft);min-width:0}.head-meta strong{display:block;color:var(--ps-text);font-size:14px}
+.workspace{display:grid;grid-template-columns:300px minmax(0,1fr);gap:14px;min-height:0;min-width:0}
+.human{border-top:3px solid var(--ps-human);padding:10px 6px 0 0;min-width:0;min-height:0;overflow:auto;scrollbar-gutter:stable}
+.human h2{margin:0 0 6px;font-size:16px}.label{margin:10px 0 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ps-text-soft)}
+.summary{margin:0;font-size:17px;line-height:1.4}.relation{margin:10px 0 0;font-size:13px;color:var(--ps-accent);font-weight:650}
+blockquote{margin:0;padding:8px 0 8px 12px;border-left:3px solid var(--ps-human);font-size:15px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.source{font-size:11px;color:var(--ps-text-soft);overflow-wrap:anywhere}#exchange-open{width:100%;margin:10px 0 4px;font-weight:650}
+.proof{display:grid;grid-template-rows:auto minmax(380px,1fr) auto;min-width:0;min-height:0;border:1px solid var(--ps-border);border-radius:16px;background:var(--ps-surface);overflow:hidden}
+.action{padding:8px 14px;border-bottom:1px solid var(--ps-border);font-size:15px;line-height:1.35;max-height:120px;overflow:auto}.action p{margin:0 0 3px}.action b{color:var(--ps-accent)}
+.stage{position:relative;min-height:0;min-width:0}#stage{position:absolute;inset:0;width:100%;height:100%;display:block}
+.artifact{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:6px 14px;border-top:1px solid var(--ps-border);background:var(--ps-bg-elevated)}
+.artifact strong{display:block;font-size:12px;color:var(--ps-accent)}.artifact .preview{margin:2px 0 0;font:13px/1.35 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+footer{display:grid;gap:6px;font-size:12px;min-width:0}.row{display:flex;align-items:center;gap:6px;min-width:0}.row.between{justify-content:space-between}
+.beats{display:flex;gap:4px;flex-wrap:wrap}.beats button{min-width:30px;min-height:28px;padding:2px 8px}.beats button[aria-current="step"]{border-color:var(--ps-accent);background:var(--ps-accent-soft);color:var(--ps-accent);font-weight:750}
+#beat-title{font-weight:650;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}#progress{white-space:nowrap;color:var(--ps-accent);font-weight:650}
+.scrub{display:flex;align-items:center;gap:6px;flex:1;min-width:140px}.scrub input{width:100%}#clock{white-space:nowrap;font:11px ui-monospace,Menlo,Consolas,monospace}
+.bottom{color:var(--ps-text-soft);font-size:11px;flex-wrap:wrap}.bottom button{min-height:22px;padding:0 6px;font-size:11px;border-color:var(--ps-border)}#scene-select{max-width:220px;font-size:12px}
+dialog{width:min(1000px,94vw);max-height:90dvh;padding:0;border:1px solid var(--ps-border-strong);border-radius:16px;background:var(--ps-bg-elevated);color:var(--ps-text);box-shadow:var(--ps-shadow)}
+dialog::backdrop{background:var(--ps-overlay)}.dialog-top{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;background:var(--ps-bg-elevated);border-bottom:1px solid var(--ps-border);z-index:1}
+.dialog-top h2{margin:0;font-size:20px;min-width:0;overflow-wrap:anywhere}.dialog-body{padding:6px 20px 20px}.dialog-body h3{margin:16px 0 4px;font-size:15px;color:var(--ps-accent)}
+.dialog-body p,.dialog-body li{font-size:15px;line-height:1.5}.exact{margin:8px 0;padding:10px 12px;border-left:3px solid var(--ps-human);background:var(--ps-surface);font:15px/1.5 "Segoe UI",Aptos,-apple-system,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+pre.mono{font:12px/1.45 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ps-text-soft)}.chron{list-style:none;padding:0;margin:0}.chron li{display:grid;grid-template-columns:140px 90px minmax(0,1fr);gap:8px;font-size:13px;padding:4px 0;border-bottom:1px solid var(--ps-border)}
+.chron time,.chron span{color:var(--ps-text-soft)}
+/* SVG */
+.s-heading{fill:var(--ps-accent);font-size:19px;font-weight:750;letter-spacing:.06em}.s-note{fill:var(--ps-text-soft);font-size:17px}
+.t-root{fill:var(--ps-accent)}.t-root-label{fill:var(--ps-accent-fg);font-size:30px;font-weight:700}
+.t-trunk{stroke:var(--ps-border-strong);stroke-width:2;fill:none}.t-trunk.active,.t-trunk.past{stroke:var(--ps-accent);stroke-width:3}
+.t-branch rect{fill:var(--ps-bg-elevated);stroke:var(--ps-border);stroke-width:2}.t-branch[data-state="active"] rect{fill:var(--ps-accent-soft);stroke:var(--ps-accent);stroke-width:3}.t-branch[data-state="past"] rect{stroke:var(--ps-border-strong)}
+.t-branch[data-state="future"]{opacity:.55}.t-title{fill:var(--ps-text);font-size:25px;font-weight:700}.t-sub{fill:var(--ps-text-soft);font-size:18px}.t-check{fill:none;stroke:var(--ps-success);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}
+.card rect.box{fill:var(--ps-surface);stroke:var(--ps-border-strong);stroke-width:1.7}.card[data-role="human"] rect.box{stroke:var(--ps-human);stroke-width:2.6}.card[data-role="discovery"] rect.box{stroke:var(--ps-accent);stroke-width:2.2}
+.card[data-role="record"] rect.box{fill:var(--ps-bg-elevated);stroke:var(--ps-record);stroke-dasharray:6 4}.card[data-state="future"]{opacity:.28}.card[data-state="active"] rect.box{fill:var(--ps-accent-soft)}
+.card .role{fill:var(--ps-text-soft);font-size:14px;font-weight:700;letter-spacing:.07em}.card .lbl{fill:var(--ps-text);font-size:24px;font-weight:560}
+.icon{fill:none;stroke:var(--ps-text);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.icon.discovery{stroke:var(--ps-accent)}.icon.record{stroke:var(--ps-record)}
+.route{fill:none;stroke:var(--ps-border-strong);stroke-width:2;opacity:.35;marker-end:url(#arrow-muted)}.route.loop{stroke-dasharray:8 6}.route.visited{stroke:var(--ps-accent);opacity:.65;marker-end:url(#arrow)}.route.active{stroke:var(--ps-accent);stroke-width:3;opacity:1;marker-end:url(#arrow)}
+.arrowhead{fill:var(--ps-accent)}.arrowhead.muted{fill:var(--ps-border-strong)}
+.route-label{fill:var(--ps-accent);font-size:15px;paint-order:stroke;stroke:var(--ps-surface);stroke-width:5px;stroke-linejoin:round}
+.dot{fill:var(--ps-accent);stroke:var(--ps-surface);stroke-width:2}.dot-count{fill:var(--ps-accent);font-size:14px;font-weight:700;paint-order:stroke;stroke:var(--ps-surface);stroke-width:4px}
+.node rect.box{fill:var(--ps-bg-elevated);stroke:var(--ps-border-strong);stroke-width:1.6}.node rect.stack{fill:var(--ps-bg-elevated);stroke:var(--ps-border);stroke-width:1.2}
+.node[data-kind="human"] rect.box{stroke:var(--ps-human);stroke-width:2.4}.node[data-kind="discovery"] rect.box{stroke:var(--ps-accent);stroke-width:2.2}.node[data-kind="record"] rect.box{stroke:var(--ps-record);stroke-dasharray:6 4}
+.node[data-state="visited"] rect.box{stroke:var(--ps-accent)}.node[data-state="active"] rect.box{fill:var(--ps-accent-soft);stroke:var(--ps-accent);stroke-width:3.2}.node[data-state="idle"]{opacity:.5}
+.node .kind{fill:var(--ps-text-soft);font-size:12px;font-weight:700;letter-spacing:.07em}.node .lbl{fill:var(--ps-text);font-size:21px;font-weight:650}.node .badge{fill:var(--ps-accent);font-size:16px;font-weight:750}
+.m-label{fill:var(--ps-text);font-size:17px}.m-axis{fill:var(--ps-text-soft);font-size:14px;font-weight:700;letter-spacing:.05em}.m-bar{fill:var(--ps-accent);opacity:.85}.m-cached{fill:var(--ps-accent);opacity:.35}.m-out{fill:var(--ps-text-soft);opacity:.8}
+.m-row[data-hl="0"]{opacity:.4}.m-val{fill:var(--ps-text-soft);font-size:14px}
+@media(min-width:1600px){.workspace{grid-template-columns:340px minmax(0,1fr);gap:22px}.summary{font-size:19px}blockquote{font-size:17px}.action{font-size:17px}}
+@media(min-width:1051px) and (min-height:680px){.app{height:100dvh}}
+@container(max-width:1050px){.workspace{grid-template-columns:1fr}.human{overflow:visible}.proof{grid-template-rows:auto 560px auto}.stage{overflow-x:auto}#stage{position:static;width:1000px;min-width:1000px;height:540px}}
+@media(max-width:1050px){.workspace{grid-template-columns:1fr}.human{overflow:visible}.proof{grid-template-rows:auto 560px auto}.stage{overflow-x:auto}#stage{position:static;width:1000px;min-width:1000px;height:540px}header{flex-wrap:wrap}.head-meta{text-align:left}}
+@media(max-width:600px){.app{padding:10px}.row{flex-wrap:wrap}#beat-title{flex-basis:100%}.artifact{grid-template-columns:1fr}.stage::before{content:"Diagram scrolls sideways \2192";display:block;font-size:12px;color:var(--ps-text-soft);padding:6px 10px 0}}
+</style>
+</head><body>
+<div class="app">
+<header>
+  <div><p class="eyebrow" id="eyebrow"></p><h1 id="scene-title"></h1></div>
+  <div class="head-meta"><strong id="story-title"></strong><span id="story-sub"></span></div>
+</header>
+<main class="workspace">
+  <section class="human" aria-labelledby="human-heading">
+    <h2 id="human-heading"></h2>
+    <p class="label" id="summary-label">In plain words — not a quote</p>
+    <p class="summary" id="human-summary"></p>
+    <div id="quote-wrap"><p class="label">Exact words (excerpt)</p><blockquote id="human-quote"></blockquote>
+      <p class="source" id="quote-source"></p><button id="exchange-open" type="button">Open exact exchange</button></div>
+    <p class="relation" id="human-relation"></p>
+  </section>
+  <section class="proof" aria-label="What Discovery did">
+    <div class="action" id="action"></div>
+    <div class="stage"><svg id="stage" viewBox="0 0 1440 780" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="stage-desc"><desc id="stage-desc"></desc>
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="arrowhead"/></marker>
+        <marker id="arrow-muted" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" class="arrowhead muted"/></marker></defs>
+      <g id="layer-static"></g><g id="layer-beat"></g><g id="layer-dots"></g></svg></div>
+    <div class="artifact"><div><strong id="artifact-label"></strong><p class="preview" id="artifact-preview"></p></div><button id="artifact-open" type="button">Open record</button></div>
+  </section>
+</main>
+<footer>
+  <div class="row between"><div class="row" style="min-width:0"><div class="beats" id="beats" role="group" aria-label="Beats"></div><span id="beat-title"></span></div><span id="progress" aria-live="polite"></span></div>
+  <div class="row">
+    <button id="prev-scene" type="button" title="Previous scene (PageUp)">⇤ Scene</button>
+    <button id="prev" type="button" title="Previous beat (←)">← Beat</button>
+    <button id="play-beat" type="button" title="Play beat (Space)">▶ Beat</button>
+    <button id="play-scene" class="primary" type="button" title="Play all beats in this scene">▶ Play scene</button>
+    <button id="next" type="button" title="Next beat (→)">Beat →</button>
+    <button id="next-scene" type="button" title="Next scene (PageDown)">Scene ⇥</button>
+    <label class="scrub"><span class="sr-only">Beat time</span><input id="scrub" type="range" min="0" max="1000" value="1000"></label>
+    <span id="clock"></span>
+  </div>
+  <div class="row between bottom">
+    <div class="row"><label class="sr-only" for="scene-select">Scene</label><select id="scene-select"></select>
+      <button id="notes-open" type="button">Presenter notes</button><button id="chron-open" type="button">Chronology</button><button id="about-open" type="button">About this story</button></div>
+    <div class="row"><label><input id="reduced" type="checkbox"> Reduced motion</label><button id="theme" type="button">Theme</button><span id="planned"></span></div>
+  </div>
+</footer>
+</div>
+<dialog id="d-exchange" aria-labelledby="d-exchange-h"><div class="dialog-top"><h2 id="d-exchange-h">Exact exchange</h2><button data-close type="button">Close</button></div><div class="dialog-body">
+  <label for="exchange-select" class="label">Message</label><select id="exchange-select"></select><div id="exchange-body"></div></div></dialog>
+<dialog id="d-artifact" aria-labelledby="d-artifact-h"><div class="dialog-top"><h2 id="d-artifact-h"></h2><button data-close type="button">Close</button></div><div class="dialog-body" id="artifact-body"></div></dialog>
+<dialog id="d-notes" aria-labelledby="d-notes-h"><div class="dialog-top"><h2 id="d-notes-h">Presenter notes</h2><button data-close type="button">Close</button></div><div class="dialog-body" id="notes-body"></div></dialog>
+<dialog id="d-chron" aria-labelledby="d-chron-h"><div class="dialog-top"><h2 id="d-chron-h">Chronology</h2><button data-close type="button">Close</button></div><div class="dialog-body"><p class="source">Recorded events in this scene's window, in order. Human text is exact; other lines are record labels.</p><ul class="chron" id="chron-list"></ul></div></dialog>
+<dialog id="d-about" aria-labelledby="d-about-h"><div class="dialog-top"><h2 id="d-about-h">About this story</h2><button data-close type="button">Close</button></div><div class="dialog-body" id="about-body"></div></dialog>
+<script type="application/json" id="story-data">__STORY_DATA__</script>
+<script>
+"use strict";
+(() => {
+const D = JSON.parse(document.getElementById("story-data").textContent);
+const NS = "http://www.w3.org/2000/svg";
+const $ = id => document.getElementById(id);
+const S = {scene: 0, beat: 0, t: 0, playing: false, phase: "settled", gen: 0, gapLeft: 0,
+           reduced: matchMedia("(prefers-reduced-motion: reduce)").matches};
+const W = {routes: [], dots: [], cards: {}, nodes: {}, edges: {}, bars: []};
+
+function el(tag, attrs, parent, text) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v !== undefined && v !== null) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function html(tag, attrs, parent, text) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+  if (text !== undefined) e.textContent = text;
+  if (parent) parent.appendChild(e);
+  return e;
+}
+const clear = e => { while (e.firstChild) e.removeChild(e.firstChild); };
+const show = (e, on) => e.toggleAttribute("hidden", !on);
+const scene = () => D.scenes[S.scene];
+const beat = () => scene().beats[S.beat];
+const dur = () => beat().animationMs;
+
+/* Fit text into maxLines lines within maxW, shrinking font down to minSize. */
+function fitText(t, str, x, y, lineH, maxW, maxLines, size, minSize) {
+  for (let fs = size; fs >= minSize; fs -= 1) {
+    clear(t); t.setAttribute("font-size", fs); t.style.fontSize = fs + "px";
+    const words = String(str || "").split(/\s+/).filter(Boolean);
+    let lines = [], cur = "";
+    const span = el("tspan", {x, y}, t);
+    const width = s => { span.textContent = s; return span.getComputedTextLength(); };
+    for (const w of words) {
+      const next = cur ? cur + " " + w : w;
+      if (width(next) <= maxW || !cur) cur = next; else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    t.removeChild(span);
+    const ok = lines.length <= maxLines && lines.every(l => width2(t, l, x, y) <= maxW);
+    if (ok || fs === minSize) {
+      if (!ok) { lines = lines.slice(0, maxLines); t.dataset.overflow = "1"; } else delete t.dataset.overflow;
+      const lh = lineH * fs / size;
+      lines.forEach((l, i) => el("tspan", {x, y: y + i * lh}, t, l));
+      return lines.length;
+    }
+  }
+}
+function width2(t, s, x, y) { const sp = el("tspan", {x, y}, t, s); const w = sp.getComputedTextLength(); t.removeChild(sp); return w; }
+
+/* ── icons ── */
+function icon(role, x, y, g) {
+  const c = {human: "icon", discovery: "icon discovery", record: "icon record"}[role] || "icon";
+  const p = {
+    human: "M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 22c0-4.4 3.6-8 8-8s8 3.6 8 8",
+    discovery: "M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5 9.8 12.2 3.5 10l6.3-1.7zM19 16l.9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9z",
+    record: "M6 2h9l5 5v15H6zM15 2v5h5M9 12h8M9 16h8"}[role] || "M4 4h16v16H4z";
+  el("path", {d: p, class: c, transform: `translate(${x} ${y})`}, g);
+}
+
+/* ── geometry ── */
+function branchLayout(n) {
+  const top = 30, span = 686, h = Math.min(110, (span - (n - 1) * 16) / n);
+  const gap = n > 1 ? Math.min(108, (span - n * h) / (n - 1)) : 0;
+  const total = n * h + (n - 1) * gap, start = top + (span - total) / 2;
+  return Array.from({length: n}, (_, i) => ({y: start + i * (h + gap), h}));
+}
+const CARD = {w: 330, h: 106};
+const cardXY = c => ({x: 580 + (c.col || 0) * 420, y: [140, 350, 560][c.row || 0]});
+function routePath(a, b, loop) {
+  const A = cardXY(a), B = cardXY(b);
+  if (loop) {
+    const ax = A.x + CARD.w / 2, ay = A.y + CARD.h, bx = B.x + CARD.w / 2, by = B.y + CARD.h;
+    const d = Math.max(ay, by) + 34;
+    return `M${ax} ${ay} C${ax} ${d} ${bx} ${d} ${bx} ${by}`;
+  }
+  if ((a.row || 0) === (b.row || 0)) {
+    const r = B.x > A.x;
+    const x1 = r ? A.x + CARD.w : A.x, x2 = r ? B.x : B.x + CARD.w, y = A.y + CARD.h / 2;
+    return `M${x1} ${y} L${x2} ${y}`;
+  }
+  if ((a.col || 0) === (b.col || 0)) {
+    const down = B.y > A.y, x = A.x + CARD.w / 2;
+    return `M${x} ${down ? A.y + CARD.h : A.y} L${x} ${down ? B.y : B.y + CARD.h}`;
+  }
+  const r = B.x > A.x, x1 = r ? A.x + CARD.w : A.x, y1 = A.y + CARD.h / 2, x2 = r ? B.x : B.x + CARD.w, y2 = B.y + CARD.h / 2;
+  const mx = (x1 + x2) / 2;
+  return `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`;
+}
+const LANES = [150, 530, 910, 1290], NODE_W = 250;
+function nodeLayout(nodes) {
+  const byLane = {};
+  nodes.forEach(n => (byLane[n.lane || 0] = byLane[n.lane || 0] || []).push(n));
+  const out = {};
+  for (const [lane, list] of Object.entries(byLane)) {
+    const k = list.length, h = Math.min(88, (640 - (k - 1) * 16) / k), gap = k > 1 ? Math.min(60, (640 - k * h) / (k - 1)) : 0;
+    const total = k * h + (k - 1) * gap, y0 = 60 + (640 - total) / 2;
+    list.forEach((n, i) => { out[n.id] = {x: LANES[lane] - NODE_W / 2, y: y0 + i * (h + gap), w: NODE_W, h, lane: +lane}; });
+  }
+  return out;
+}
+function edgePath(A, B) {
+  if (A.lane === B.lane) {
+    const x = A.x + A.w, down = B.y > A.y, y1 = A.y + A.h / 2, y2 = B.y + B.h / 2;
+    return `M${x} ${y1} C${x + 70} ${y1} ${x + 70} ${y2} ${x} ${y2}` + (down ? "" : "");
+  }
+  const fwd = B.lane > A.lane, off = fwd ? -8 : 8;
+  const x1 = fwd ? A.x + A.w : A.x, x2 = fwd ? B.x : B.x + B.w, y1 = A.y + A.h / 2 + off, y2 = B.y + B.h / 2 + off, mx = (x1 + x2) / 2;
+  return `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`;
+}
+
+/* ── static layer per scene ── */
+function renderStatic() {
+  const g = $("layer-static"); clear(g); W.cards = {}; W.nodes = {}; W.edges = {};
+  const sc = scene();
+  if (sc.mode === "tree") {
+    el("rect", {x: 20, y: 30, width: 165, height: 686, rx: 18, class: "t-root"}, g);
+    const rl = el("text", {class: "t-root-label", "text-anchor": "middle"}, g);
+    fitText(rl, sc.tree.root, 102, 360, 36, 140, 4, 30, 16);
+    const lay = branchLayout(sc.tree.branches.length);
+    W.branches = sc.tree.branches.map((b, i) => {
+      const L = lay[i], cy = L.y + L.h / 2;
+      const trunk = el("path", {d: `M185 ${cy} L260 ${cy}`, class: "t-trunk"}, g);
+      const bg = el("g", {class: "t-branch", "data-index": i}, g);
+      el("rect", {x: 260, y: L.y, width: 275, height: L.h, rx: 14}, bg);
+      fitText(el("text", {class: "t-title"}, bg), b.title, 280, L.y + 38, 30, 205, 1, 25, 15);
+      if (b.sub && L.h >= 80) fitText(el("text", {class: "t-sub"}, bg), b.sub, 280, L.y + 68, 22, 235, 2, 18, 12);
+      const chk = el("path", {d: `M${497} ${L.y + 26} l7 7 l13 -15`, class: "t-check"}, bg);
+      return {g: bg, trunk, chk, cy, L};
+    });
+  } else if (sc.mode === "flow") {
+    const pos = nodeLayout(sc.graph.nodes);
+    for (const e of sc.graph.edges) {
+      const p = el("path", {d: edgePath(pos[e.from], pos[e.to]), class: "route", "data-edge": e.id}, g);
+      W.edges[e.id] = {path: p, def: e};
+    }
+    for (const n of sc.graph.nodes) {
+      const P = pos[n.id], ng = el("g", {class: "node", "data-kind": n.kind, "data-id": n.id}, g);
+      if ((n.count || 1) > 1) { el("rect", {x: P.x + 12, y: P.y + 12, width: P.w, height: P.h, rx: 12, class: "stack"}, ng);
+                                el("rect", {x: P.x + 6, y: P.y + 6, width: P.w, height: P.h, rx: 12, class: "stack"}, ng); }
+      el("rect", {x: P.x, y: P.y, width: P.w, height: P.h, rx: 12, class: "box"}, ng);
+      if (P.h >= 54) el("text", {x: P.x + 14, y: P.y + 20, class: "kind"}, ng, (n.kindLabel || n.kind).toUpperCase());
+      fitText(el("text", {class: "lbl"}, ng), n.label, P.x + 14, P.y + (P.h >= 54 ? P.h / 2 + 12 : P.h / 2 + 7), 24, P.w - ((n.count || 1) > 1 ? 70 : 28), P.h >= 80 ? 2 : 1, 21, 12);
+      if ((n.count || 1) > 1) el("text", {x: P.x + P.w - 12, y: P.y + P.h / 2 + 6, class: "badge", "text-anchor": "end"}, ng, "×" + n.count);
+      W.nodes[n.id] = {g: ng, P};
+    }
+    for (const e of sc.graph.edges) if (e.label) {
+      const p = W.edges[e.id].path, m = p.getPointAtLength(p.getTotalLength() / 2);
+      el("text", {x: m.x, y: m.y - 8, class: "route-label", "text-anchor": "middle"}, g, e.label);
+    }
+  }
+}
+
+/* ── per-beat layer ── */
+function renderBeatLayer() {
+  const g = $("layer-beat"), dl = $("layer-dots"); clear(g); clear(dl); W.routes = []; W.bars = []; W.cards = {};
+  const sc = scene(), b = beat();
+  if (sc.mode === "tree") {
+    const tb = b.tree, active = tb.branch;
+    W.branches.forEach((br, i) => {
+      const st = i < active ? "past" : i === active ? "active" : "future";
+      br.g.dataset.state = st; br.trunk.setAttribute("class", "t-trunk " + st);
+      br.chk.toggleAttribute("hidden", st !== "past");
+    });
+    const br = W.branches[active];
+    el("path", {d: `M535 ${br.cy} C558 ${br.cy} 556 64 578 64`, class: "t-trunk active"}, g);
+    fitText(el("text", {class: "s-heading"}, g), (tb.title || "").toUpperCase(), 588, 72, 24, 750, 1, 19, 13);
+    const byId = {};
+    for (const c of tb.cards) {
+      byId[c.id] = c;
+      const P = cardXY(c), cg = el("g", {class: "card", "data-role": c.role, "data-id": c.id}, g);
+      el("rect", {x: P.x, y: P.y, width: CARD.w, height: CARD.h, rx: 12, class: "box"}, cg);
+      icon(c.role, P.x + 16, P.y + 12, cg);
+      el("text", {x: P.x + 50, y: P.y + 30, class: "role"}, cg, ({human: "HUMAN", discovery: "DISCOVERY", record: "RECORD"})[c.role] || c.role.toUpperCase());
+      fitText(el("text", {class: "lbl"}, cg), c.label, P.x + 18, P.y + 62, 28, CARD.w - 32, 2, 24, 14);
+      W.cards[c.id] = {g: cg, def: c};
+    }
+    tb.routes.forEach((r, i) => {
+      const p = el("path", {d: routePath(byId[r.from], byId[r.to], r.loop), class: "route" + (r.loop ? " loop" : ""), "data-route": i}, g);
+      if (r.label) { const m = p.getPointAtLength(p.getTotalLength() / 2); el("text", {x: m.x, y: m.y - 8, class: "route-label", "text-anchor": "middle"}, g, r.label); }
+      W.routes.push({path: p, def: r, phase: b.routePhase[i], len: p.getTotalLength(), count: 1});
+    });
+    if (tb.note) fitText(el("text", {class: "s-note"}, g), tb.note, 580, 709, 22, 760, 2, 17, 12);
+  } else if (sc.mode === "flow") {
+    const fb = b.flow;
+    if (fb.title) fitText(el("text", {class: "s-heading"}, g), fb.title.toUpperCase(), 25, 34, 24, 1390, 1, 19, 13);
+    (fb.phases || []).forEach((ph, pi) => ph.forEach(pk => {
+      const E = W.edges[pk.edge];
+      W.routes.push({path: E.path, def: pk, phase: pi, len: E.path.getTotalLength(), count: pk.count || 1, reverse: !!pk.reverse});
+    }));
+    if (fb.note) fitText(el("text", {class: "s-note"}, g), fb.note, 25, 752, 22, 1390, 1, 17, 12);
+  } else if (sc.mode === "metrics") {
+    renderMetrics(g, sc, b);
+  }
+  for (const r of W.routes) {
+    const n = Math.min(r.count, 5);
+    r.dots = Array.from({length: n}, () => el("circle", {r: 8, class: "dot", visibility: "hidden"}, dl));
+    r.badge = r.count > 1 ? el("text", {class: "dot-count", visibility: "hidden"}, dl, "×" + r.count) : null;
+  }
+}
+
+function fmtNum(v) {
+  const a = Math.abs(v);
+  return a >= 1e9 ? (v / 1e9).toFixed(2) + "B" : a >= 1e6 ? (v / 1e6).toFixed(1) + "M" : a >= 1e3 ? (v / 1e3).toFixed(1) + "K" : String(v);
+}
+function renderMetrics(g, sc, b) {
+  const mb = b.metrics || {}, grp = sc.metrics.groups.find(x => x.id === mb.group) || sc.metrics.groups[0];
+  fitText(el("text", {class: "s-heading"}, g), (mb.title || grp.label).toUpperCase(), 25, 40, 24, 1390, 1, 19, 13);
+  const rows = grp.rows.slice(0, 12), n = rows.length || 1, rh = Math.min(54, 590 / n);
+  const maxIn = Math.max(1, ...rows.map(r => r.input || 0)), maxOut = Math.max(1, ...rows.map(r => r.output || 0));
+  el("text", {x: 330, y: 84, class: "m-axis"}, g, "INPUT TOKENS  (lighter = cached reads)");
+  el("text", {x: 1050, y: 84, class: "m-axis"}, g, "OUTPUT TOKENS");
+  const hl = new Set(mb.highlight || []);
+  rows.forEach((r, i) => {
+    const y = 100 + i * rh, rg = el("g", {class: "m-row", "data-hl": hl.size && !hl.has(r.label) ? "0" : "1"}, g);
+    fitText(el("text", {class: "m-label"}, rg), r.label, 25, y + rh / 2 + 6, 20, 290, 1, 17, 11);
+    const wIn = 500 * (r.input || 0) / maxIn, wC = 500 * Math.min(r.cachedRead || 0, r.input || 0) / maxIn, wOut = 230 * (r.output || 0) / maxOut;
+    const bh = Math.max(8, rh - 18);
+    const bars = [
+      el("rect", {x: 330, y: y + 6, height: bh, width: 0, class: "m-bar"}, rg),
+      el("rect", {x: 330, y: y + 6, height: bh, width: 0, class: "m-cached"}, rg),
+      el("rect", {x: 1050, y: y + 6, height: bh, width: 0, class: "m-out"}, rg)];
+    el("text", {x: 330 + wIn + 8, y: y + 6 + bh / 2 + 5, class: "m-val"}, rg, fmtNum(r.input || 0) + (r.calls ? `  · ${r.calls} calls` : ""));
+    el("text", {x: 1050 + wOut + 8, y: y + 6 + bh / 2 + 5, class: "m-val"}, rg, fmtNum(r.output || 0));
+    W.bars.push({bars, w: [wIn - wC, wC, wOut], x: [330 + wC, 330, 1050]});
+  });
+  const note = mb.note || (sc.metrics.caveats || []).join(" ");
+  if (note) fitText(el("text", {class: "s-note"}, g), note, 25, 736, 22, 1390, 2, 16, 11);
+}
+
+/* ── time-dependent rendering ── */
+function phaseAt(t) {
+  const w = beat().phaseWindows;
+  if (!w.length) return -1;
+  for (let i = 0; i < w.length; i++) if (t < w[i][1]) return i;
+  return w.length - 1;
+}
+function renderTime() {
+  const b = beat(), d = dur(), t = Math.max(0, Math.min(d, S.t)), cur = phaseAt(t), settled = t >= d;
+  const moving = !S.reduced && S.playing && !settled;
+  const rank = {future: 0, visited: 1, active: 2}, pathState = new Map();
+  if (scene().mode === "flow") for (const [id, E] of Object.entries(W.edges)) pathState.set(E.path, (b.visitedEdges || []).includes(id) ? "visited" : "future");
+  for (const r of W.routes) {
+    const st = r.phase < cur ? "visited" : r.phase === cur ? "active" : "future";
+    if (!pathState.has(r.path) || rank[st] > rank[pathState.get(r.path)]) pathState.set(r.path, st);
+  }
+  for (const [p, st] of pathState) { p.classList.toggle("visited", st === "visited"); p.classList.toggle("active", st === "active"); }
+  for (const r of W.routes) {
+    const st = r.phase < cur ? "visited" : r.phase === cur ? "active" : "future";
+    const w = b.phaseWindows[r.phase], prog = w ? Math.max(0, Math.min(1, (t - w[0]) / (w[1] - w[0]))) : 1;
+    const vis = moving && st === "active" && prog > 0 && prog < 1;
+    const at = r.len * (r.reverse ? 1 - prog : prog), pt = r.path.getPointAtLength(at);
+    const pt2 = r.path.getPointAtLength(Math.min(r.len, at + 1)), ang = Math.atan2(pt2.y - pt.y, pt2.x - pt.x);
+    r.dots.forEach((c, i) => {
+      const off = (i - (r.dots.length - 1) / 2) * 12;
+      c.setAttribute("cx", pt.x - Math.sin(ang) * off); c.setAttribute("cy", pt.y + Math.cos(ang) * off);
+      c.setAttribute("visibility", vis ? "visible" : "hidden");
+    });
+    if (r.badge) { r.badge.setAttribute("x", pt.x + 12); r.badge.setAttribute("y", pt.y - 12); r.badge.setAttribute("visibility", vis ? "visible" : "hidden"); }
+  }
+  const sc = scene();
+  if (sc.mode === "tree") {
+    const touched = {};
+    for (const r of W.routes) for (const id of [r.def.from, r.def.to]) {
+      const s = r.phase < cur ? "done" : r.phase === cur ? "active" : "future";
+      const rank = {future: 0, done: 1, active: 2};
+      if (!(id in touched) || rank[s] > rank[touched[id]]) touched[id] = s;
+    }
+    const fallback = W.routes.length ? "done" : "active";
+    for (const [id, c] of Object.entries(W.cards)) c.g.dataset.state = touched[id] || fallback;
+  } else if (sc.mode === "flow") {
+    const visited = new Set(b.visitedNodes), act = new Set(b.flow.active || []);
+    for (const r of W.routes) {
+      const e = W.edges[r.def.edge].def;
+      if (r.phase < cur || settled) { visited.add(e.from); visited.add(e.to); }
+      if (r.phase === cur) { act.add(e.from); act.add(e.to); }
+    }
+    for (const [id, n] of Object.entries(W.nodes)) n.g.dataset.state = act.has(id) ? "active" : visited.has(id) ? "visited" : "idle";
+  } else if (sc.mode === "metrics") {
+    const k = S.reduced || settled ? 1 : t / d;
+    for (const row of W.bars) row.bars.forEach((r, i) => { r.setAttribute("width", Math.max(0, row.w[i] * k)); r.setAttribute("x", i === 0 ? 330 + row.w[1] * k : row.x[i]); });
+  }
+  $("scrub").value = String(Math.round(1000 * t / d));
+  $("clock").textContent = `${(t / 1000).toFixed(1)} / ${(d / 1000).toFixed(1)} s` + (S.phase === "gap" ? " · pause" : "");
+}
+
+/* ── panels ── */
+function quoteHeading(q) { return {request: "Human request", answer: "Human answer", control: "Human control"}[q.kind] || "Human"; }
+function renderPanels() {
+  const sc = scene(), b = beat(), h = b.human || {}, q = h.quoteId ? D.quotes[h.quoteId] : null;
+  $("eyebrow").textContent = `Scene ${S.scene + 1} of ${D.scenes.length}` + (sc.milestone ? ` · ${sc.milestone}` : "") + (sc.appendix ? " · appendix" : "");
+  $("scene-title").textContent = sc.title;
+  $("human-heading").textContent = q ? (h.heading || quoteHeading(q)) : h.heading;
+  $("human-summary").textContent = h.summary || "";
+  $("summary-label").textContent = q ? "In plain words — not a quote" : "Summary";
+  show($("quote-wrap"), !!q);
+  if (q) {
+    let ex;
+    if (h.excerpt) { const i = q.text.indexOf(h.excerpt); ex = (i > 0 ? "… " : "") + h.excerpt + (i + h.excerpt.length < q.text.length ? " …" : ""); }
+    else ex = q.text.length > 320 ? q.text.slice(0, 320).trimEnd() + " …" : q.text;
+    $("human-quote").textContent = ex;
+    $("quote-source").textContent = (q.kind === "answer" && q.title ? `Answer to “${q.title}” · ` : "") + (q.when || "");
+  }
+  $("human-relation").textContent = h.relation || "";
+  show($("human-relation"), !!h.relation);
+  const a = $("action"); clear(a);
+  const dsc = b.discovery || {};
+  if (dsc.action) { const p = html("p", {}, a); html("b", {}, p, "Discovery: "); p.append(dsc.action); }
+  if (dsc.result) { const p = html("p", {}, a); html("b", {}, p, "Result: "); p.append(dsc.result); }
+  const art = b.artifact;
+  show($("artifact-open"), !!(art && (art.detail || art.preview)));
+  $("artifact-label").textContent = art ? art.label : "No record for this beat";
+  $("artifact-preview").textContent = art ? (art.preview || "") : "";
+  $("stage-desc").textContent = b.label + ". " + (dsc.result || "");
+  const beats = $("beats"); clear(beats);
+  sc.beats.forEach((x, i) => { const bt = html("button", {type: "button", title: x.label, "aria-label": `Beat ${i + 1}: ${x.label}`}, beats, String(i + 1));
+    if (i === S.beat) bt.setAttribute("aria-current", "step"); bt.addEventListener("click", () => jump(S.scene, i)); });
+  $("beat-title").textContent = b.label;
+  const overall = D.scenes.slice(0, S.scene).reduce((n, s) => n + s.beats.length, 0) + S.beat + 1;
+  $("progress").textContent = `Beat ${S.beat + 1}/${sc.beats.length} · overall ${overall}/${D.beatCount}`;
+  $("scene-select").value = String(S.scene);
+  $("prev").disabled = S.scene === 0 && S.beat === 0;
+  $("next").disabled = S.scene === D.scenes.length - 1 && S.beat === sc.beats.length - 1;
+  $("prev-scene").disabled = S.scene === 0; $("next-scene").disabled = S.scene === D.scenes.length - 1;
+  history.replaceState(null, "", `#s=${S.scene + 1}&b=${S.beat + 1}`);
+}
+function renderAll() { if (W.staticScene !== S.scene) { renderStatic(); W.staticScene = S.scene; } renderBeatLayer(); renderPanels(); renderTime(); updateControls(); }
+function updateControls() { $("play-scene").textContent = S.playing ? "■ Stop" : "▶ Play scene"; $("play-beat").disabled = S.playing; }
+
+/* ── playback: one RAF owner, generation-cancelled ── */
+function stop() { S.gen++; S.playing = false; if (S.phase !== "settled") S.phase = S.t >= dur() ? "settled" : "paused"; updateControls(); }
+function jump(s, b, t) {
+  S.gen++; S.playing = false; S.phase = "settled";
+  S.scene = Math.max(0, Math.min(D.scenes.length - 1, s));
+  S.beat = Math.max(0, Math.min(scene().beats.length - 1, b));
+  S.t = t === undefined ? dur() : t;
+  renderAll();
+}
+function seek(ms) { S.gen++; S.playing = false; S.phase = "paused"; S.t = Math.max(0, Math.min(dur(), ms)); renderTime(); updateControls(); }
+function run(wholeScene) {
+  S.gen++; const g = S.gen;
+  if (wholeScene && S.beat === scene().beats.length - 1 && S.t >= dur()) { S.beat = 0; renderBeatLayer(); renderPanels(); }
+  if (!wholeScene || S.t >= dur()) S.t = 0;
+  S.playing = true; S.phase = "beat"; S.whole = wholeScene; updateControls();
+  let last = performance.now();
+  const step = now => {
+    if (g !== S.gen) return;
+    const dt = Math.min(100, now - last); last = now;
+    if (S.phase === "beat") {
+      S.t = S.reduced ? dur() : Math.min(dur(), S.t + dt); renderTime();
+      if (S.t >= dur()) {
+        if (S.whole && S.beat < scene().beats.length - 1) { S.phase = "gap"; S.gapLeft = D.gapMs; }
+        else { S.phase = "complete"; S.playing = false; renderTime(); updateControls(); return; }
+      }
+    } else if (S.phase === "gap") {
+      S.gapLeft -= dt; renderTime();
+      if (S.gapLeft <= 0) { S.beat++; S.t = 0; S.phase = "beat"; renderBeatLayer(); renderPanels(); renderTime(); }
+    }
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function stepBeat(d) {
+  const sc = scene(); let s = S.scene, b = S.beat + d;
+  if (b < 0) { if (s === 0) return; s--; b = D.scenes[s].beats.length - 1; }
+  if (b >= sc.beats.length) { if (s === D.scenes.length - 1) return; s++; b = 0; }
+  jump(s, b);
+}
+
+/* ── dialogs ── */
+function openDialog(id) { stop(); $(id).showModal(); }
+function renderExchange(id) {
+  const body = $("exchange-body"); clear(body); const q = D.quotes[id]; if (!q) return;
+  html("h3", {}, body, quoteHeading(q) + (q.title ? ` — ${q.title}` : ""));
+  if (q.question) html("p", {class: "source"}, body, "Question shown to the human: " + q.question);
+  html("div", {class: "exact"}, body, q.text);
+  html("p", {class: "source"}, body, [q.when, q.session ? `session “${q.session}”` : "", q.source].filter(Boolean).join(" · "));
+}
+function openExchange() {
+  const b = beat(), ids = b.exchangeIds && b.exchangeIds.length ? b.exchangeIds : (b.human && b.human.quoteId ? [b.human.quoteId] : []);
+  const sel = $("exchange-select"); clear(sel);
+  ids.forEach(id => { const q = D.quotes[id]; html("option", {value: id}, sel, `${quoteHeading(q)} · ${q.when || ""} · ${q.text.slice(0, 60).replace(/\s+/g, " ")}`); });
+  sel.value = (b.human && b.human.quoteId) || ids[0]; renderExchange(sel.value); openDialog("d-exchange");
+}
+function openArtifact() {
+  const a = beat().artifact || {}, body = $("artifact-body"); clear(body);
+  $("d-artifact-h").textContent = a.label || "Record";
+  if (a.preview) html("div", {class: "exact"}, body, a.preview);
+  if (a.detail) html("pre", {class: "mono"}, body, a.detail);
+  if (a.source) html("p", {class: "source"}, body, "Source: " + a.source);
+  openDialog("d-artifact");
+}
+function openNotes() {
+  const body = $("notes-body"); clear(body); const sc = scene(), b = beat();
+  html("h3", {}, body, `Scene ${S.scene + 1}: ${sc.title}`);
+  html("p", {}, body, `Planned speaking time: ${Math.round(sc.seconds)} s` + (sc.appendix ? " (appendix — skip if short on time)" : ""));
+  if (sc.notes) html("p", {}, body, sc.notes);
+  html("h3", {}, body, `Beat ${S.beat + 1}: ${b.label}`);
+  if (b.notes) html("p", {}, body, b.notes);
+  openDialog("d-notes");
+}
+function openChron() {
+  const ul = $("chron-list"); clear(ul);
+  for (const c of scene().chronology || []) { const li = html("li", {}, ul); html("time", {}, li, c.t); html("span", {}, li, c.kind); html("div", {}, li, c.label); }
+  if (!(scene().chronology || []).length) html("li", {}, ul, "No recorded events attached to this scene.");
+  openDialog("d-chron");
+}
+function openAbout() {
+  const body = $("about-body"); clear(body); const A = D.about || {};
+  html("p", {}, body, D.subtitle || "");
+  if (A.method) { html("h3", {}, body, "How this story was made"); html("p", {}, body, A.method); }
+  if ((A.caveats || []).length) { html("h3", {}, body, "Read with care"); const ul = html("ul", {}, body); A.caveats.forEach(c => html("li", {}, ul, c)); }
+  html("h3", {}, body, "Build"); html("pre", {class: "mono"}, body, JSON.stringify(D.build, null, 1));
+  html("h3", {}, body, "Controls"); html("p", {}, body, "← / → beat · PageUp / PageDown scene · Space play beat · P play scene · N notes · E exact exchange · Esc close. Link to a beat with #s=2&b=3; force a theme with ?theme=light or ?theme=dark.");
+  openDialog("d-about");
+}
+
+/* ── wiring ── */
+D.scenes.forEach((s, i) => html("option", {value: String(i)}, $("scene-select"), `${i + 1}. ${s.title}`));
+$("story-title").textContent = D.title; $("story-sub").textContent = D.subtitle || "";
+$("planned").textContent = `${D.minutes} min spoken plan`;
+$("scene-select").addEventListener("change", e => jump(+e.target.value, 0));
+$("prev").addEventListener("click", () => stepBeat(-1)); $("next").addEventListener("click", () => stepBeat(1));
+$("prev-scene").addEventListener("click", () => jump(S.scene - 1, 0)); $("next-scene").addEventListener("click", () => jump(S.scene + 1, 0));
+$("play-beat").addEventListener("click", () => run(false));
+$("play-scene").addEventListener("click", () => S.playing ? stop() : run(true));
+$("scrub").addEventListener("input", e => seek(dur() * (+e.target.value) / 1000));
+$("reduced").checked = S.reduced; $("reduced").addEventListener("change", e => { S.reduced = e.target.checked; renderTime(); });
+$("theme").addEventListener("click", () => { const r = document.documentElement; r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark"; });
+$("exchange-open").addEventListener("click", openExchange); $("exchange-select").addEventListener("change", e => renderExchange(e.target.value));
+$("artifact-open").addEventListener("click", openArtifact); $("notes-open").addEventListener("click", openNotes);
+$("chron-open").addEventListener("click", openChron); $("about-open").addEventListener("click", openAbout);
+document.querySelectorAll("dialog [data-close]").forEach(b => b.addEventListener("click", () => b.closest("dialog").close()));
+document.addEventListener("keydown", e => {
+  if (document.querySelector("dialog[open]") || /INPUT|SELECT|TEXTAREA/.test(e.target.tagName) && e.target.type !== "range") return;
+  const k = e.key;
+  if (k === "ArrowRight") { e.preventDefault(); stepBeat(1); } else if (k === "ArrowLeft") { e.preventDefault(); stepBeat(-1); }
+  else if (k === "PageDown") { e.preventDefault(); jump(S.scene + 1, 0); } else if (k === "PageUp") { e.preventDefault(); jump(S.scene - 1, 0); }
+  else if (k === " ") { e.preventDefault(); S.playing ? stop() : run(false); } else if (k === "p" || k === "P") { S.playing ? stop() : run(true); }
+  else if (k === "n" || k === "N") openNotes(); else if ((k === "e" || k === "E") && beat().human && beat().human.quoteId) openExchange();
+});
+const m = /s=(\d+)&b=(\d+)/.exec(location.hash);
+S.scene = m ? Math.max(0, Math.min(D.scenes.length - 1, +m[1] - 1)) : 0;
+S.beat = m ? Math.max(0, Math.min(scene().beats.length - 1, +m[2] - 1)) : 0;
+S.t = dur();
+W.staticScene = -1;
+renderAll();
+window.STORY = {data: D, jump, seek, stop, playBeat: () => run(false), playScene: () => run(true),
+  state: () => ({scene: S.scene, beat: S.beat, t: S.t, playing: S.playing, phase: S.phase, reduced: S.reduced})};
+})();
+</script>
+</body></html>
