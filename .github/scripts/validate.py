@@ -465,6 +465,20 @@ def main():
             for d in os.listdir(skills_root)
             if os.path.isdir(os.path.join(skills_root, d)) and not d.startswith(".")
         )
+        # A loose file directly under skills/ is almost always a mistake — it is
+        # silently ignored by the per-skill walk below, so it gets called out
+        # rather than quietly doing nothing.
+        strays = sorted(
+            f
+            for f in os.listdir(skills_root)
+            if not os.path.isdir(os.path.join(skills_root, f)) and not f.startswith(".")
+        )
+        if strays:
+            err(
+                f"skills/ contains loose file(s) that are not skills: "
+                f"{', '.join(strays)}. Every entry under skills/ must be a skill "
+                f"directory; repo-level files belong at the repository root."
+            )
         if not found:
             err("skills/ contains no skills")
         for d in found:
