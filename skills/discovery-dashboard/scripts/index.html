@@ -123,6 +123,8 @@
     border: 1px solid var(--line); color: var(--dim); white-space: nowrap;
   }
   .pill.running { color: var(--ok); border-color: var(--ok); }
+  .pill.sleeping { color: var(--accent); border-color: var(--accent); }
+  .pill.idle, .pill.paused { color: var(--warn); border-color: var(--warn); }
   .pill.finished { color: var(--info); border-color: var(--info); }
   .pill.stopped { color: var(--bad); border-color: var(--bad); }
   .pill.unknown { color: var(--unknown); border-color: var(--unknown); }
@@ -264,13 +266,17 @@ function renderOverview(s) {
   // Engines.
   const engines = (s.engines && s.engines.engines) || [];
   const live = engines.filter(e => e.liveness === "running").length;
+  const sleeping = engines.filter(e => e.liveness === "sleeping").length;
+  const idle = engines.filter(e => e.liveness === "idle").length;
+  const paused = engines.filter(e => e.liveness === "paused").length;
   const unknown = engines.filter(e => e.liveness === "unknown").length;
   const engineRows = engines.length ? `<ul class="list">` + engines.slice(0, 12).map(e =>
     `<li><span class="ttl">${esc(e.definitionId || "")}
       <span class="sub mono">${esc((e.instanceId || "").slice(0, 12))}</span>
       <div class="sub">${esc(e.adapterKind || "")}${
         e.startedAt ? " · started " + esc(ago(e.startedAt)) : ""}${
-        e.livenessBasis ? " · " + esc(e.livenessBasis) : ""}</div></span>
+        e.livenessBasis ? " · " + esc(e.livenessBasis) : ""}${
+        e.recordedWakeAt ? " · recorded wake " + esc(e.recordedWakeAt) : ""}</div></span>
       <span class="pill ${esc(e.liveness)}">${esc(e.liveness)}</span></li>`
   ).join("") + `</ul>` : empty("No engine runs recorded.");
 
@@ -313,10 +319,13 @@ function renderOverview(s) {
     ${panel("Awaiting review", (T.awaitingReview || []).length,
       taskList(T.awaitingReview, { showStatus: true, emptyText: "Nothing awaiting review." }),
       `<code>executionDone</code> — finished executing, <b>not</b> approved.`)}
-    ${panel("Engines", `${live} running · ${unknown} unknown · ${engines.length} total`,
+    ${panel("Engines", `${live} running · ${sleeping} sleeping · ${idle} idle · ${
+        paused} paused · ${unknown} unknown · ${engines.length} total`,
       engineRows,
       `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
-       not be verified against its recorded start time. Age is never used to infer a stall.`)}
+       not be verified against its recorded start time. Sleeping uses recorded scheduling
+       evidence, not a live scheduler query; its deadline may differ slightly from the
+       supervisor's actual wake time. Age is never used to infer a stall.`)}
   </div>`);
 
   // Agents.
@@ -513,6 +522,13 @@ function renderMethodology(s) {
     <li>Engine liveness requires the recorded pid to exist <b>and</b> its observed start time
         to match the record. A matching pid with a different start time is pid reuse and
         reports <b>unknown</b>. A live shared host does not prove a worker is healthy.</li>
+    <li><code>completedAt</code> marks the end of an execution turn. It means
+        <b>finished</b> only with a terminal recorded state. Sleeping is inferred from a
+        recorded wake deadline or a successful structured <code>engine-sleep</code>
+        acknowledgement in the latest completed cycle.</li>
+    <li>A recorded wake deadline is not a live scheduler query and may differ slightly from
+        the supervisor's actual wake time. After it expires, the engine reports <b>idle</b>
+        until fresh evidence arrives; it is not guessed to be running or finished.</li>
     <li>Agent runs are deduplicated across an alias graph of every id they are known by, not
         a single run id.</li>
     <li>CLIO <b>investigations</b> are listed with the state each run recorded for

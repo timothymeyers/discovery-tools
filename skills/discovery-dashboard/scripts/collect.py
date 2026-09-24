@@ -34,9 +34,12 @@ Task identity
     carried; joins are always on the UUID.
 
 Engine liveness
-  - `completedAt` present  -> finished. This outranks everything else.
-  - No completedAt, PID verified live -> running.
-  - No completedAt, PID verifiably dead -> stopped.
+  - `completedAt` is the end of an execution turn, not necessarily the engine.
+    It means finished only when `state` also records a terminal lifecycle state.
+  - A verified owner plus a future recorded wake deadline means sleeping.
+  - Verified Idle and Paused states remain distinct from finished.
+  - A verified owner with no inactive-state evidence means running.
+  - A verifiably dead owner means stopped.
   - Anything else -> unknown. Explicitly unknown, never "stalled".
   - Age is NEVER used to diagnose a stall. `run.json`/`meta.json` writtenAtUtc
     and startedAt are startup metadata, not heartbeats. Log mtime is evidence of
@@ -79,7 +82,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 # Bounded cold-tail read. Never rescan a full history.
 TAIL_BYTES = 512 * 1024
@@ -87,6 +90,13 @@ TAIL_BYTES = 512 * 1024
 # Seconds of tolerance when matching an observed process start time against the
 # recorded one. Wider than clock jitter, far narrower than a plausible reuse.
 PID_START_TOLERANCE_S = 90
+
+TERMINAL_ENGINE_STATES = {
+    "cancelled", "canceled", "completed", "failed", "finished", "stopped", "terminated",
+}
+SLEEP_DEADLINE_KEYS = {
+    "sleepuntil", "wakeat", "wakeupat", "wakedeadline", "scheduledwakeat",
+}
 
 DONE_STATUS = "complete"
 AWAITING_STATUS = "executiondone"
@@ -153,6 +163,13 @@ def _parse_iso(value):
     text = value.strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
+    # Python 3.9 accepts only 3 or 6 fractional digits. Discovery emits variable
+    # precision, so normalize every fraction to microseconds.
+    text = re.sub(
+        r"\.(\d+)(?=(?:[+-]\d\d:\d\d)?$)",
+        lambda match: "." + (match.group(1) + "000000")[:6],
+        text,
+    )
     try:
         dt = datetime.fromisoformat(text)
     except ValueError:
@@ -160,6 +177,116 @@ def _parse_iso(value):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _nested_values(value):
+    """Yield nested mappings/lists from a structured acknowledgement."""
+    yield value
+    if isinstance(value, dict):
+        for child in value.values():
+            for nested in _nested_values(child):
+                yield nested
+    elif isinstance(value, list):
+        for child in value:
+            for nested in _nested_values(child):
+                yield nested
+
+
+def _sleep_deadline(value):
+    """Return the first valid, normalized wake deadline in structured data."""
+    for nested in _nested_values(value):
+        if not isinstance(nested, dict):
+            continue
+        for key, candidate in nested.items():
+            if str(key).replace("_", "").lower() not in SLEEP_DEADLINE_KEYS:
+                continue
+            parsed = _parse_iso(candidate)
+            if parsed:
+                return _iso(parsed)
+    return None
+
+
+def _structured_json(content):
+    """Parse JSON objects from an event body without treating prose as evidence."""
+    if not isinstance(content, str):
+        return []
+    candidates = re.findall(r"```(?:json)?\s*(.*?)```", content, re.I | re.S)
+    stripped = content.strip()
+    if stripped.startswith(("{", "[")):
+        candidates.append(stripped)
+    values = []
+    for candidate in candidates:
+        try:
+            values.append(json.loads(candidate))
+        except (TypeError, ValueError):
+            pass
+    return values
+
+
+def _successful_sleep_ack(event):
+    """Return a deadline from a successful structured engine-sleep result."""
+    if _norm_status(event.get("kind")) != "actionapplied":
+        return None
+    content = event.get("content")
+    values = _structured_json(content)
+    for value in values:
+        mappings = [v for v in _nested_values(value) if isinstance(v, dict)]
+        tool_named = bool(re.search(r"(?<![\w-])engine-sleep(?![\w-])",
+                                    content or "", re.I))
+        tool_named = tool_named or any(
+            str(mapping.get(key, "")).lower() == "engine-sleep"
+            for mapping in mappings for key in ("tool", "toolName", "name")
+        )
+        failed = any(
+            mapping.get("success") is False
+            or mapping.get("isError") is True
+            or str(mapping.get("status", "")).lower()
+            in ("error", "failed", "failure")
+            for mapping in mappings
+        )
+        success = any(
+            mapping.get("success") is True
+            or mapping.get("isError") is False
+            or str(mapping.get("status", "")).lower() in ("ok", "success", "succeeded")
+            for mapping in mappings
+        )
+        if tool_named and success and not failed:
+            deadline = _sleep_deadline(value)
+            if deadline:
+                return deadline
+    return None
+
+
+def _recorded_sleep(instance_dir, completed_at):
+    """Return the latest-cycle recorded wake deadline, if one is trustworthy."""
+    lines, _ = _tail_lines(instance_dir / "output.jsonl")
+    events = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+
+    done_indexes = [
+        index for index, event in enumerate(events)
+        if _norm_status(event.get("kind")) == "done"
+    ]
+    cycle_start = done_indexes[-2] + 1 if len(done_indexes) > 1 else 0
+    cycle_end = done_indexes[-1] + 1 if done_indexes else len(events)
+
+    best = None
+    for event in events[cycle_start:cycle_end]:
+        deadline = _successful_sleep_ack(event)
+        timestamp = _parse_iso(event.get("timestamp"))
+        if not deadline or not timestamp:
+            continue
+        if completed_at and timestamp > completed_at:
+            continue
+        if best is None or timestamp > best[0]:
+            best = (timestamp, deadline)
+    return best[1] if best else None
 
 
 def _norm_status(value):
@@ -552,19 +679,39 @@ class Collector:
 
     def _engine_record(self, meta, definition_dir, instance_dir):
         completed_at = meta.get("completedAt")
+        completed_dt = _parse_iso(completed_at)
         pid = meta.get("ownerProcessId")
         proc_state, proc_detail = verify_process(pid, meta.get("ownerProcessStartedAt"))
+        reported_state = _norm_status(meta.get("state"))
+        recorded_wake_at = _sleep_deadline(meta)
+        sleep_basis = "wake deadline recorded in meta.json" if recorded_wake_at else None
+        if not recorded_wake_at:
+            recorded_wake_at = _recorded_sleep(instance_dir, completed_dt)
+            if recorded_wake_at:
+                sleep_basis = "latest completed cycle acknowledged engine-sleep"
 
-        # completedAt outranks every other signal.
-        if completed_at:
-            state, why = "finished", "completedAt is set"
-        elif proc_state == "live":
-            state, why = "running", proc_detail
+        if completed_at and reported_state in TERMINAL_ENGINE_STATES:
+            state, why = "finished", "completedAt and terminal state %s" % meta.get("state")
         elif proc_state == "dead":
             state, why = "stopped", proc_detail
-        else:
-            # Explicitly unknown. Age is never used to infer a stall.
+        elif proc_state != "live":
+            # Preserve uncertainty when the owner cannot be attributed to this
+            # run. A shared host process alone is not worker-health evidence.
             state, why = "unknown", proc_detail
+        else:
+            wake_dt = _parse_iso(recorded_wake_at)
+            if wake_dt and wake_dt > _utcnow():
+                state, why = "sleeping", "%s; scheduled wake %s" % (
+                    sleep_basis, recorded_wake_at)
+            elif reported_state == "paused":
+                state, why = "paused", "recorded state is Paused; " + proc_detail
+            elif reported_state in ("idle", "sleeping") or recorded_wake_at:
+                state, why = "idle", (
+                    "recorded wake deadline expired; awaiting fresh evidence"
+                    if recorded_wake_at else "recorded state is %s" % meta.get("state")
+                )
+            else:
+                state, why = "running", proc_detail
 
         output_path = instance_dir / "output.jsonl"
         log_written_at = None
@@ -589,6 +736,7 @@ class Collector:
             "processState": proc_state,
             "liveness": state,
             "livenessBasis": why,
+            "recordedWakeAt": recorded_wake_at,
             # Named to make its epistemic status unmistakable at the call site.
             "logLastWrittenAt": log_written_at,
             "isCopilotCli": (meta.get("adapterKind") or "").lower() == "copilot-cli",
