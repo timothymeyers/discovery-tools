@@ -163,9 +163,13 @@ def _parse_iso(value):
     text = value.strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
-    # Discovery can emit nanoseconds. Python 3.9's fromisoformat accepts at most
-    # microseconds, so trim only excess fractional precision.
-    text = re.sub(r"(\.\d{6})\d+(?=(?:[+-]\d\d:\d\d)?$)", r"\1", text)
+    # Python 3.9 accepts only 3 or 6 fractional digits. Discovery emits variable
+    # precision, so normalize every fraction to microseconds.
+    text = re.sub(
+        r"\.(\d+)(?=(?:[+-]\d\d:\d\d)?$)",
+        lambda match: "." + (match.group(1) + "000000")[:6],
+        text,
+    )
     try:
         dt = datetime.fromisoformat(text)
     except ValueError:
@@ -233,12 +237,20 @@ def _successful_sleep_ack(event):
             str(mapping.get(key, "")).lower() == "engine-sleep"
             for mapping in mappings for key in ("tool", "toolName", "name")
         )
+        failed = any(
+            mapping.get("success") is False
+            or mapping.get("isError") is True
+            or str(mapping.get("status", "")).lower()
+            in ("error", "failed", "failure")
+            for mapping in mappings
+        )
         success = any(
             mapping.get("success") is True
+            or mapping.get("isError") is False
             or str(mapping.get("status", "")).lower() in ("ok", "success", "succeeded")
             for mapping in mappings
         )
-        if tool_named and success:
+        if tool_named and success and not failed:
             deadline = _sleep_deadline(value)
             if deadline:
                 return deadline

@@ -9,7 +9,7 @@ Read-only, loopback-only, standard library only.
     python3 discovery_dashboard.py [--port 8787] [--workspace .]
     python3 discovery_dashboard.py --once | --json | --html out.html
 
-Source checksum: 5284fd017278715e
+Source checksum: ee56a828c2ee9a9e
 """
 
 from __future__ import annotations
@@ -104,9 +104,13 @@ def _parse_iso(value):
     text = value.strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
-    # Discovery can emit nanoseconds. Python 3.9's fromisoformat accepts at most
-    # microseconds, so trim only excess fractional precision.
-    text = re.sub(r"(\.\d{6})\d+(?=(?:[+-]\d\d:\d\d)?$)", r"\1", text)
+    # Python 3.9 accepts only 3 or 6 fractional digits. Discovery emits variable
+    # precision, so normalize every fraction to microseconds.
+    text = re.sub(
+        r"\.(\d+)(?=(?:[+-]\d\d:\d\d)?$)",
+        lambda match: "." + (match.group(1) + "000000")[:6],
+        text,
+    )
     try:
         dt = datetime.fromisoformat(text)
     except ValueError:
@@ -174,12 +178,20 @@ def _successful_sleep_ack(event):
             str(mapping.get(key, "")).lower() == "engine-sleep"
             for mapping in mappings for key in ("tool", "toolName", "name")
         )
+        failed = any(
+            mapping.get("success") is False
+            or mapping.get("isError") is True
+            or str(mapping.get("status", "")).lower()
+            in ("error", "failed", "failure")
+            for mapping in mappings
+        )
         success = any(
             mapping.get("success") is True
+            or mapping.get("isError") is False
             or str(mapping.get("status", "")).lower() in ("ok", "success", "succeeded")
             for mapping in mappings
         )
-        if tool_named and success:
+        if tool_named and success and not failed:
             deadline = _sleep_deadline(value)
             if deadline:
                 return deadline
@@ -1848,6 +1860,7 @@ function renderOverview(s) {
   const live = engines.filter(e => e.liveness === "running").length;
   const sleeping = engines.filter(e => e.liveness === "sleeping").length;
   const idle = engines.filter(e => e.liveness === "idle").length;
+  const paused = engines.filter(e => e.liveness === "paused").length;
   const unknown = engines.filter(e => e.liveness === "unknown").length;
   const engineRows = engines.length ? `<ul class="list">` + engines.slice(0, 12).map(e =>
     `<li><span class="ttl">${esc(e.definitionId || "")}
@@ -1899,7 +1912,7 @@ function renderOverview(s) {
       taskList(T.awaitingReview, { showStatus: true, emptyText: "Nothing awaiting review." }),
       `<code>executionDone</code> — finished executing, <b>not</b> approved.`)}
     ${panel("Engines", `${live} running · ${sleeping} sleeping · ${idle} idle · ${
-        unknown} unknown · ${engines.length} total`,
+        paused} paused · ${unknown} unknown · ${engines.length} total`,
       engineRows,
       `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
        not be verified against its recorded start time. Sleeping uses recorded scheduling

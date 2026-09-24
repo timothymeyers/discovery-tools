@@ -275,7 +275,8 @@ class EngineLivenessTests(TempWorkspaceCase):
         payload = self._affected_fixture()
         payload["events"][0]["content"] = (
             '**engine-sleep**\n```json\n'
-            '{"success":false,"result":{"sleepUntil":"2099-09-24T14:44:42Z"}}\n```'
+            '{"success":false,"transport":{"status":"ok"},'
+            '"result":{"sleepUntil":"2099-09-24T14:44:42Z"}}\n```'
         )
         self.ws.engine_run(
             "mission-control", "i1", payload["meta"], payload["events"])
@@ -365,9 +366,19 @@ class EngineLivenessTests(TempWorkspaceCase):
             self.ws.collect()["engines"]["engines"][0]["liveness"], "finished")
 
     def test_variable_precision_timestamp_parses_on_python_39(self):
-        parsed = collector._parse_iso("2026-09-24T14:19:42.123456789Z")
-        self.assertEqual(
-            parsed.isoformat(), "2026-09-24T14:19:42.123456+00:00")
+        cases = {
+            ".1": ".100000", ".12": ".120000", ".123": ".123000",
+            ".1234": ".123400", ".12345": ".123450",
+            ".123456789": ".123456",
+        }
+        for supplied, expected in cases.items():
+            with self.subTest(precision=supplied):
+                parsed = collector._parse_iso(
+                    "2026-09-24T14:19:42%sZ" % supplied)
+                self.assertEqual(
+                    parsed.isoformat(),
+                    "2026-09-24T14:19:42%s+00:00" % expected,
+                )
 
     def test_structured_status_success_is_accepted(self):
         event = {

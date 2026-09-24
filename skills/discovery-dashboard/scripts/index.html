@@ -268,6 +268,7 @@ function renderOverview(s) {
   const live = engines.filter(e => e.liveness === "running").length;
   const sleeping = engines.filter(e => e.liveness === "sleeping").length;
   const idle = engines.filter(e => e.liveness === "idle").length;
+  const paused = engines.filter(e => e.liveness === "paused").length;
   const unknown = engines.filter(e => e.liveness === "unknown").length;
   const engineRows = engines.length ? `<ul class="list">` + engines.slice(0, 12).map(e =>
     `<li><span class="ttl">${esc(e.definitionId || "")}
@@ -319,7 +320,7 @@ function renderOverview(s) {
       taskList(T.awaitingReview, { showStatus: true, emptyText: "Nothing awaiting review." }),
       `<code>executionDone</code> — finished executing, <b>not</b> approved.`)}
     ${panel("Engines", `${live} running · ${sleeping} sleeping · ${idle} idle · ${
-        unknown} unknown · ${engines.length} total`,
+        paused} paused · ${unknown} unknown · ${engines.length} total`,
       engineRows,
       `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
        not be verified against its recorded start time. Sleeping uses recorded scheduling
