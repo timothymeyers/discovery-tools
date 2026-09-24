@@ -60,10 +60,13 @@ Evaluated in strict precedence order:
 
 | Condition | State |
 |---|---|
-| `completedAt` present | `finished` |
-| no `completedAt`, pid verified live | `running` |
-| no `completedAt`, pid verifiably dead | `stopped` |
-| anything else | `unknown` |
+| `completedAt` and a terminal recorded state | `finished` |
+| owner verified, future recorded wake deadline | `sleeping` |
+| owner verified, recorded state `Paused` | `paused` |
+| owner verified, recorded state `Idle`, or an expired wake deadline | `idle` |
+| owner verified, no inactive-state evidence | `running` |
+| owner verifiably dead | `stopped` |
+| owner identity cannot be verified | `unknown` |
 
 **Age is never used to diagnose a stall.** `meta.json` `startedAt` and
 `run.json` `writtenAtUtc` are startup metadata, not heartbeats. A log file's
@@ -85,8 +88,19 @@ worker.
 A live shared host process does not prove any individual worker is healthy.
 Runtime owner pid cannot be attributed to a run without a verified mapping.
 
-**Idle is not finished.** Idle means inactive; `completedAt` is what makes a run
-finished.
+**Idle is not finished.** In recurring engines, `completedAt` marks the end of an
+execution turn. It is terminal only when `state` also records a terminal lifecycle
+state (`Completed`, `Failed`, `Stopped`, `Terminated`, `Cancelled`, or equivalent).
+
+Sleeping requires recorded scheduling evidence: either a parseable future wake
+deadline in `meta.json`, or a successful, structured `engine-sleep`
+acknowledgement from the latest completed cycle. Proposed calls, failed results,
+malformed results, and acknowledgements from earlier cycles are not evidence.
+Once a recorded deadline expires, the state is `idle` pending fresh evidence,
+never automatically `running` or `finished`.
+
+`recordedWakeAt` is explicitly not a live scheduler query. The acknowledged
+deadline can differ slightly from the supervisor's actual wake time.
 
 ## Agent run identity
 

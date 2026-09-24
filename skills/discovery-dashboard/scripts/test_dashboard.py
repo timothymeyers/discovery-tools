@@ -20,6 +20,7 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -195,6 +196,25 @@ class DependencyTests(TempWorkspaceCase):
 # --------------------------------------------------------------------------
 
 class EngineLivenessTests(TempWorkspaceCase):
+    def _verified_meta(self, **over):
+        started = collector._process_start_epoch(os.getpid())
+        meta = {
+            "instanceId": "i1",
+            "definitionId": "mission-control",
+            "state": "Running",
+            "ownerProcessId": os.getpid(),
+            "ownerProcessStartedAt": datetime.fromtimestamp(
+                started, timezone.utc).isoformat(),
+        }
+        meta.update(over)
+        return meta
+
+    def _affected_fixture(self):
+        fixture = Path(__file__).parent / "fixtures" / "affected_sleeping_engine.json"
+        payload = json.loads(fixture.read_text(encoding="utf-8"))
+        payload["meta"] = self._verified_meta(**payload["meta"])
+        return payload
+
     def test_completed_at_outranks_process_state(self):
         self.ws.engine_run("mission-control", "i1", {
             "instanceId": "i1", "definitionId": "mission-control",
@@ -204,6 +224,183 @@ class EngineLivenessTests(TempWorkspaceCase):
         })
         engine = self.ws.collect()["engines"]["engines"][0]
         self.assertEqual(engine["liveness"], "finished")
+
+    def test_completed_at_does_not_finish_an_idle_recurring_engine(self):
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Idle", completedAt="2026-09-24T14:19:42Z"))
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_completed_at_does_not_finish_a_nonterminal_running_engine(self):
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Running", completedAt="2026-09-24T14:19:42Z"))
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "running")
+
+    def test_failed_terminal_state_is_finished_historically(self):
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "state": "Failed", "completedAt": "2026-09-24T14:19:42Z",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "finished")
+
+    def test_future_meta_sleep_deadline_is_sleeping(self):
+        deadline = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Idle", completedAt="2026-09-24T14:19:42Z",
+            sleepUntil=deadline))
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertEqual(engine["liveness"], "sleeping")
+        self.assertEqual(engine["recordedWakeAt"], deadline)
+
+    def test_sanitized_affected_run_fixture_is_sleeping(self):
+        payload = self._affected_fixture()
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertEqual(engine["liveness"], "sleeping")
+        self.assertEqual(
+            engine["recordedWakeAt"], "2099-09-24T14:44:42.123456+00:00")
+
+    def test_proposed_sleep_is_not_acknowledged(self):
+        payload = self._affected_fixture()
+        payload["events"][0]["kind"] = "ActionProposed"
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_failed_sleep_is_not_acknowledged(self):
+        payload = self._affected_fixture()
+        payload["events"][0]["content"] = (
+            '**engine-sleep**\n```json\n'
+            '{"success":false,"result":{"sleepUntil":"2099-09-24T14:44:42Z"}}\n```'
+        )
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_malformed_sleep_is_not_acknowledged(self):
+        payload = self._affected_fixture()
+        payload["events"][0]["content"] = (
+            '**engine-sleep**\n```json\n{"success":true,"sleepUntil":\n```'
+        )
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_untimestamped_sleep_ack_is_not_current_cycle_evidence(self):
+        payload = self._affected_fixture()
+        payload["events"][0].pop("timestamp")
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_sleep_ack_after_completed_at_is_rejected(self):
+        payload = self._affected_fixture()
+        payload["events"][0]["timestamp"] = "2026-09-24T15:19:42Z"
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "idle")
+
+    def test_previous_cycle_sleep_is_not_current_evidence(self):
+        payload = self._affected_fixture()
+        payload["events"].append({
+            "kind": "Done",
+            "timestamp": "2026-09-24T15:19:42Z",
+            "content": "A later execution turn completed.",
+        })
+        payload["meta"]["completedAt"] = "2026-09-24T15:19:42Z"
+        self.ws.engine_run(
+            "mission-control", "i1", payload["meta"], payload["events"])
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertEqual(engine["liveness"], "idle")
+        self.assertIsNone(engine["recordedWakeAt"])
+
+    def test_expired_sleep_deadline_becomes_idle(self):
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Idle", completedAt="2026-09-24T14:19:42Z",
+            sleepUntil="2001-01-01T00:00:00Z"))
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertEqual(engine["liveness"], "idle")
+        self.assertIn("expired", engine["livenessBasis"])
+
+    def test_paused_remains_distinct(self):
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Paused", completedAt="2026-09-24T14:19:42Z"))
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "paused")
+
+    def test_sleep_without_owner_identity_is_unknown(self):
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "state": "Idle", "completedAt": "2026-09-24T14:19:42Z",
+            "sleepUntil": "2099-01-01T00:00:00Z",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "unknown")
+
+    def test_sleep_with_reused_owner_identity_is_unknown(self):
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "state": "Idle", "completedAt": "2026-09-24T14:19:42Z",
+            "sleepUntil": "2099-01-01T00:00:00Z",
+            "ownerProcessId": os.getpid(),
+            "ownerProcessStartedAt": "1999-01-01T00:00:00Z",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "unknown")
+
+    def test_historical_terminal_run_finishes_without_owner(self):
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "state": "Completed", "completedAt": "2026-09-24T14:19:42Z",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "finished")
+
+    def test_variable_precision_timestamp_parses_on_python_39(self):
+        parsed = collector._parse_iso("2026-09-24T14:19:42.123456789Z")
+        self.assertEqual(
+            parsed.isoformat(), "2026-09-24T14:19:42.123456+00:00")
+
+    def test_structured_status_success_is_accepted(self):
+        event = {
+            "kind": "ActionApplied",
+            "content": (
+                '```json\n{"tool":"engine-sleep","status":"success",'
+                '"wakeAt":"2099-01-01T00:00:00Z"}\n```'
+            ),
+        }
+        self.assertEqual(
+            collector._successful_sleep_ack(event),
+            "2099-01-01T00:00:00+00:00",
+        )
+
+    def test_snake_case_sleep_deadline_is_accepted(self):
+        event = {
+            "kind": "ActionApplied",
+            "content": (
+                '```json\n{"toolName":"engine-sleep","success":true,'
+                '"sleep_until":"2099-01-01T00:00:00Z"}\n```'
+            ),
+        }
+        self.assertEqual(
+            collector._successful_sleep_ack(event),
+            "2099-01-01T00:00:00+00:00",
+        )
+
+    def test_unstructured_success_text_is_rejected(self):
+        event = {
+            "kind": "ActionApplied",
+            "content": "engine-sleep succeeded; wake at 2099-01-01T00:00:00Z",
+        }
+        self.assertIsNone(collector._successful_sleep_ack(event))
 
     def test_dead_pid_without_completion_is_stopped_and_raises_an_alert(self):
         self.ws.engine_run("mission-control", "i1", {
