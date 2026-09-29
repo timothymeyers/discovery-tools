@@ -56,6 +56,7 @@ metadata an agent needs to evaluate, install, and drive the tool.
 
 | Tool | Author | License | Pointer skill |
 |---|---|---|---|
+| [`hullrad-axi`](https://github.com/davenovelli-pnnl/hullrad-axi) — hydrodynamic properties (mass, translational/rotational diffusion) from a PDB or mmCIF structure, wrapping HullRad 10.2 | Dave Novelli (PNNL) | MIT AND Unlicense | — |
 | [`osti-axi`](https://github.com/davenovelli-pnnl/osti-axi) — OSTI.GOV search and full-text retrieval CLI for agents | Dave Novelli (PNNL) | MIT | [`osti-literature-search`](skills/osti-literature-search) |
 
 The machine-readable registry is [`tools/external-tools.json`](tools/external-tools.json).
