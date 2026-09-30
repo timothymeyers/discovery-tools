@@ -146,7 +146,7 @@ def resolve_journal(explicit=None, env=None):
     Precedence: an explicit path (--journal), then $DISCOVERY_TOKEN_JOURNAL,
     then the most recently written journal that exists across the app
     channels. Returns (path_or_None, candidates_probed); the path is None only
-    when no default candidate exists.
+    when none of the candidate journals exist on disk.
     """
     env = os.environ if env is None else env
     override = explicit or env.get(JOURNAL_ENV_VAR)
