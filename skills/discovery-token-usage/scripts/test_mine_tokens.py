@@ -129,6 +129,15 @@ class JournalStateTest(unittest.TestCase):
         self.assertEqual(rows, [])
         self.assertEqual(state, "empty")
 
+    def test_all_lines_corrupt_is_not_reported_as_empty(self):
+        path = os.path.join(self.tmp, "corrupt.jsonl")
+        with open(path, "w") as fh:
+            fh.write("{not json at all\n")
+        rows, bad, _rec, state = mine_tokens.mine_journal(path)
+        self.assertEqual(rows, [])
+        self.assertEqual(bad, 1)
+        self.assertEqual(state, "corrupt")
+
     def test_populated_journal(self):
         path = os.path.join(self.tmp, "full.jsonl")
         with open(path, "w") as fh:

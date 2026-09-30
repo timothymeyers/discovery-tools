@@ -151,7 +151,8 @@ def resolve_journal(explicit=None, env=None):
     env = os.environ if env is None else env
     override = explicit or env.get(JOURNAL_ENV_VAR)
     if override:
-        return os.path.abspath(os.path.expanduser(override)), [override]
+        resolved = os.path.abspath(os.path.expanduser(override))
+        return resolved, [resolved]
     candidates = journal_candidates()
     existing = [p for p in candidates if os.path.exists(p)]
     if not existing:
@@ -166,8 +167,9 @@ def mine_journal(path=None):
     """Read the TokenJournal.
 
     Returns (rows, bad, recovered, state) where state is 'missing' (no journal
-    file at all — interactive usage is unknown, not zero), 'empty' (journal
-    present but no usable records) or 'ok'.
+    file at all — interactive usage is unknown, not zero), 'corrupt' (nothing
+    usable survived, but lines were dropped), 'empty' (journal present with no
+    records) or 'ok'.
     """
     rows, bad, recovered = [], 0, 0
     path = JOURNAL if path is None else path
@@ -191,7 +193,9 @@ def mine_journal(path=None):
             if "_sentinel" in d:
                 continue
             rows.append(d)
-    return rows, bad, recovered, ("ok" if rows else "empty")
+    if rows:
+        return rows, bad, recovered, "ok"
+    return rows, bad, recovered, ("corrupt" if bad else "empty")
 
 
 def j_in(d):
@@ -636,7 +640,8 @@ def main():
            f"${JOURNAL_ENV_VAR} if the journal lives elsewhere.")
     else:
         _v(f"   path: {JOURNAL}"
-           + ("  (present but empty)" if journal_state == "empty" else ""))
+           + {"empty": "  (present but empty)",
+              "corrupt": "  (present, but no line was readable)"}.get(journal_state, ""))
     real_journal, idle_journal, placeholder_journal = classify_journal(rows_journal)
     if idle_journal:
         _v(f"   ⚠ suppressed {len(idle_journal):,} records matching Discovery App "
@@ -1029,7 +1034,9 @@ def _terse_summary(*, stderr_rows, best, acp, prompts, real_journal,
             print(f"    probed: {c}")
         print(f"    pass --journal <path> or set ${JOURNAL_ENV_VAR} to point at it")
     else:
-        suffix = " (journal present but empty)" if journal_state == "empty" else ""
+        suffix = {"empty": " (journal present but empty)",
+                  "corrupt": " (journal present but every line was unreadable)"
+                  }.get(journal_state, "")
         print(f"Interactive             {inter_total[0]:,} calls · "
               f"{_humanize(inter_total[1])} in / {_humanize(inter_total[2])} out{suffix}")
     if inter_agg:
@@ -1090,7 +1097,7 @@ def _parse_args():
     p.add_argument("--journal", metavar="PATH",
                    help="Override the TokenJournal path (source A). Defaults to the "
                         "newest token-usage.jsonl across the Discovery App and "
-                        f"Discovery App Preview support directories. Also settable "
+                        "Discovery App Preview support directories. Also settable "
                         f"via ${JOURNAL_ENV_VAR}.")
     p.add_argument("--verbose", "-v", action="store_true",
                    help="Also print the full detailed source tables (A/B/C/D/E/F/G/H/H2). "
