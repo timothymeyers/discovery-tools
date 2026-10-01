@@ -13,7 +13,7 @@ description: |
   deck", "replay the project", "animated walkthrough of the work", "how was
   this built with Discovery", "project story HTML", "explain the project to
   leadership", "demo what Discovery did". DO NOT USE FOR: writing the research
-  paper itself (arxiv-paper), PowerPoint decks (pptx), or token-only read-outs
+  paper itself (build-research-paper), PowerPoint decks (pptx), or token-only read-outs
   (discovery-token-usage).
 metadata:
   version: "1"
