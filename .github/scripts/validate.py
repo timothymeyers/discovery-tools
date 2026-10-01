@@ -428,6 +428,146 @@ def check_external_tools():
     print(f"external tools OK: {', '.join(sorted(seen))}")
 
 
+def check_external_catalogs():
+    """Lint tools/external-catalogs.json and enforce it as the source of truth.
+
+    An external *catalog* is a third-party collection of agent skills, not an
+    installable CLI. Nothing lands on PATH and there is no `--version` to run,
+    so the tools registry's install.* contract does not apply and these get
+    their own file rather than a conditional branch inside check_external_tools.
+
+    The threat model is also broader than a binary's: every SKILL.md is a prompt
+    the user's agent will load and follow, and skills may ship scripts it will
+    execute. So consent gating is validated here the same way, and the entry is
+    additionally required to carry explicit safety guidance.
+    """
+    path = os.path.join(ROOT, "tools", "external-catalogs.json")
+    if not os.path.isfile(path):
+        return  # optional file
+
+    # tools/ is outside the per-skill walk, so nothing else JSON-lints this file.
+    try:
+        reg = json.load(open(path, encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        err(f"tools/external-catalogs.json: invalid JSON — {e}")
+        return
+
+    catalogs = reg.get("catalogs")
+    if not isinstance(catalogs, list) or not catalogs:
+        err("tools/external-catalogs.json: 'catalogs' must be a non-empty array")
+        return
+
+    readme_path = os.path.join(ROOT, "README.md")
+    readme = (
+        open(readme_path, encoding="utf-8").read()
+        if os.path.isfile(readme_path)
+        else ""
+    )
+
+    required = ("name", "description", "repository", "license", "author", "format")
+    seen = set()
+
+    for c in catalogs:
+        n = c.get("name", "<unnamed>")
+        for f in required:
+            if not c.get(f):
+                err(f"external catalog {n!r}: missing required field {f!r}")
+
+        if n in seen:
+            err(f"external catalog {n!r}: duplicate entry")
+        seen.add(n)
+
+        if not NAME_RE.match(n):
+            err(f"external catalog {n!r}: name must be lowercase-hyphenated")
+
+        # Pointers must never silently become vendored content.
+        if c.get("bundled") is not False:
+            err(
+                f"external catalog {n!r}: 'bundled' must be false — this catalog "
+                f"vendors no third-party content"
+            )
+
+        # A catalog ships prompts and scripts the agent will load and run.
+        if c.get("requiresConfirmation") is not True:
+            err(
+                f"external catalog {n!r}: 'requiresConfirmation' must be true for "
+                f"external catalogs"
+            )
+
+        safety = c.get("safety") or {}
+        if safety.get("autoInstall") is not False:
+            err(
+                f"external catalog {n!r}: safety.autoInstall must be false — agents "
+                f"must never install a third-party skill catalog unattended"
+            )
+        if not safety.get("notes"):
+            err(
+                f"external catalog {n!r}: safety.notes is required — record what an "
+                f"agent and a human each need to know before loading these skills"
+            )
+
+        # `repository` is the authoritative upstream. A read-only distribution
+        # mirror (e.g. an OSTI GitLab) goes under `mirror`, so that neither the
+        # authority nor the URL users actually browse is lost.
+        repo = c.get("repository", "")
+        if repo and not repo.startswith("https://"):
+            err(f"external catalog {n!r}: repository must be an https:// URL")
+
+        urls = [repo] if repo else []
+
+        mirror = c.get("mirror")
+        if mirror is not None:
+            if not isinstance(mirror, dict) or not mirror.get("url"):
+                err(f"external catalog {n!r}: 'mirror' must be an object with a 'url'")
+            else:
+                urls.append(mirror["url"])
+                if mirror["url"].rstrip("/") == repo.rstrip("/"):
+                    err(
+                        f"external catalog {n!r}: mirror.url duplicates repository; "
+                        f"drop 'mirror' if there is only one location"
+                    )
+                _check_ref(n, mirror, "mirror.sourceRef")
+
+        _check_ref(n, c, "sourceRef")
+
+        fmt = c.get("format") or {}
+        if fmt and fmt.get("ghSkillInstallable") is None:
+            err(
+                f"external catalog {n!r}: format.ghSkillInstallable is required — a "
+                f"nested catalog cannot be installed with 'gh skill install', and "
+                f"silently letting a user assume otherwise is a real failure mode"
+            )
+
+        # The README is the human-facing half of this registry. Require EVERY
+        # declared location to be linked, not just one: an "any of" rule would
+        # let the mirror — the URL users are actually pointed at — silently drop
+        # out while the upstream link alone kept CI green.
+        if readme and urls:
+            unlinked = [u for u in urls if u.rstrip("/") not in readme]
+            if unlinked:
+                err(
+                    f"external catalog {n!r}: README.md does not link "
+                    f"{', '.join(unlinked)}. Both the authoritative upstream and any "
+                    f"mirror must stay discoverable from the README — which one is "
+                    f"foregrounded is a presentation choice, dropping one is not."
+                )
+
+    print(f"external catalogs OK: {', '.join(sorted(seen))}")
+
+
+def _check_ref(name, obj, label):
+    """A pinned ref must be immutable: a full commit SHA, never a branch."""
+    ref = obj.get("sourceRef")
+    if not ref:
+        err(
+            f"external catalog {name!r}: {label} is required — pin to a tag or "
+            f"commit so a citation names an exact revision"
+        )
+        return
+    if obj.get("sourceRefType") == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
+        err(f"external catalog {name!r}: {label} must be a full 40-char commit SHA")
+
+
 def check_readme(skill_names):
     """The README skills table must list every skill, with its category.
 
@@ -488,6 +628,7 @@ def main():
 
     check_manifests()
     check_external_tools()
+    check_external_catalogs()
 
     for w in warnings:
         print(f"WARN  {w}")

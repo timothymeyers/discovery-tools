@@ -146,6 +146,37 @@ to reach for the tool. Write your own prose. Do not copy upstream documentation
 wholesale; link to the upstream README **at the pinned commit** for the
 authoritative reference, and summarize only what the agent needs.
 
+## Adding an external catalog
+
+To point at **someone else's skill catalog**, add an entry to
+[`tools/external-catalogs.json`](tools/external-catalogs.json) — not to
+`external-tools.json`. The two are deliberately separate: that registry is for
+installable CLI binaries and its `install.steps` / `install.verify` contract is
+meaningless for a catalog, where nothing lands on `PATH` and there is no
+`--version` to run.
+
+Required fields: `name`, `description`, `repository`, `license`, `author`, and
+`format`. CI additionally enforces:
+
+- `bundled: false` and `requiresConfirmation: true`, as for tools.
+- `safety.autoInstall: false` plus non-empty `safety.notes`. A catalog ships
+  prompts your agent will follow and scripts it may run — write down what a
+  human needs to know before any of it loads.
+- `sourceRef` pinned to a **full 40-character commit SHA**, so a citation names
+  an exact revision.
+- `format.ghSkillInstallable` present. If the catalog does not use the flat
+  `skills/<name>/SKILL.md` layout, `gh skill install` will not work against it
+  and the entry must say so rather than let a user assume otherwise.
+- `repository` is the **authoritative upstream**. If the catalog is also
+  published through a read-only mirror, put that under `mirror` (with its own
+  `url` and pinned `sourceRef`) rather than overwriting `repository` — and
+  re-compare the two SHAs whenever you move a pin, since a mirror can lag.
+- The README must link **both** the upstream and any mirror. Which one you
+  foreground is a presentation choice; dropping one is not.
+
+Do **not** write a pointer skill for a catalog that already ships its own
+discovery skill. Record it under `discovery` instead and link it.
+
 ## Manifests
 
 Two files must stay byte-identical: `.github/plugin/marketplace.json` and
