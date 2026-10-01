@@ -70,6 +70,48 @@ skill agrees with it.
 > before installing one. Installing this catalog's plugin does **not** install
 > any external tool.
 
+### External catalogs
+
+Other people's skill catalogs that this one makes discoverable. Same rule as
+above — nothing is vendored here, and installing this catalog's plugin installs
+nothing from them.
+
+| Catalog | Author | License | Layout |
+|---|---|---|---|
+| [`genesis-skills`](https://gitlab.osti.gov/genesis/genesis-skills/) — Agent Skills for science and engineering from the DOE **Genesis Mission**: HPC job submission (Slurm, PBS, Aurora, Frontier, Perlmutter), plasma simulation (Gkeyll, GS2), scientific-data metadata and schemas, AI evaluation, AI safety, research data-movement APIs, literature search, multi-agent systems | ModCon / Genesis Mission | BSD-2-Clause | Nested (`skills/<domain>/<skill>/`) — **not** `gh skill install`-able |
+
+The link above is the OSTI GitLab project, which is a **read-only mirror**. Its
+own README designates [`AI-ModCon/genesis-skills`](https://github.com/AI-ModCon/genesis-skills)
+on GitHub as the authoritative upstream for development, forks, issues, and
+pull requests — file things there. Both resolve to the same commit at the ref
+pinned in the registry.
+
+Because its skills are grouped one directory deeper than the flat
+`skills/<name>/SKILL.md` convention, `gh skill install` does not work against
+it. Upstream ships two routes instead: `unpack.sh`, which flattens skills into
+your agent's skills directory, and a bundled `skill-search` skill that explores
+the nested catalog in place without copying anything. **Prefer `skill-search`
+when you only want to look.**
+
+The machine-readable registry is [`tools/external-catalogs.json`](tools/external-catalogs.json),
+which carries the pinned refs, the layout caveat, the domain inventory, and
+safety metadata.
+
+> [!CAUTION]
+> A third-party **skill catalog is a wider surface than a third-party tool**.
+> Every `SKILL.md` is a prompt your agent loads and follows, and skills may ship
+> scripts your agent executes — so the risk includes prompt injection and
+> hidden instructions, not just code execution. Nothing in an external catalog
+> is reviewed or warranted here.
+>
+> - **Do not let an agent run `unpack.sh` autonomously.** It copies skills into
+>   your agent's skills directory, or (with `--mode symlink`) links a live clone
+>   into it, after which a later `git pull` silently changes what your agent
+>   runs. It also replaces existing same-named entries — run `./unpack.sh --list`
+>   first and check for collisions.
+> - **Review the individual skill you want**, not the catalog as a whole.
+>   Installing 35+ unreviewed skills to get one is not a reasonable trade.
+
 ### Agents
 
 None yet. Custom agents will live in `agents/` as `*.agent.md`.
@@ -185,6 +227,7 @@ discovery-tools/
 ├── plugin.json                     # plugin manifest — plugin root IS the repo root
 ├── skills/<name>/SKILL.md          # the catalog; installable via `gh skill install`
 ├── tools/external-tools.json       # registry of external tools (pointers, never vendored)
+├── tools/external-catalogs.json    # registry of external skill catalogs (pointers too)
 ├── agents/<name>.agent.md          # custom agents (none yet)
 ├── starter-kits/<name>/            # project scaffolds (none yet)
 ├── .github/plugin/marketplace.json # Copilot CLI marketplace manifest
