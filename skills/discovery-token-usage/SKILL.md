@@ -106,12 +106,20 @@ but the terse output uses the static-multiplier calculation only.
    numbers are the *real* counts, not the raw journal totals. Do not go into
    detail on the bug unless asked.
 
-4. **Do NOT elaborate on:** the two-plane framing, cache weak spots per agent,
+4. **If the read-out says `Interactive  UNKNOWN — TokenJournal not found`,
+   report it as missing data, never as zero usage.** The journal path is per
+   Discovery App channel (stable vs Preview); the miner probes both and prints
+   the paths it tried. If the user's journal lives elsewhere, re-run with
+   `--journal <path>` (or set `$DISCOVERY_TOKEN_JOURNAL`). A journal that
+   exists but holds no records is reported separately as
+   `0 calls … (journal present but empty)`.
+
+5. **Do NOT elaborate on:** the two-plane framing, cache weak spots per agent,
    fixed prompt overhead (79 tools ≈ 29K tokens), the RFI-corpus program
    narrative from prompt text, or which engine outweighs which. Those go
    into the report/verbose output — never in the default summary.
 
-5. **After the read-out is delivered, offer the markdown report ONCE:**
+6. **After the read-out is delivered, offer the markdown report ONCE:**
    > "Want me to also write a full markdown report to the workspace?"
 
    If yes, re-run with `--report <path>` where `<path>` defaults to
@@ -189,7 +197,7 @@ python3 "$MINER" \
 
 | # | Source | What it gives |
 |---|---|---|
-| A | `~/Library/Application Support/DiscoveryApp/telemetry/token-usage.jsonl` | Per-request interactive-plane usage. `model`, `provider`, `capability`, `operation`, real+estimated tokens. |
+| A | `~/Library/Application Support/DiscoveryApp{,Preview}/telemetry/token-usage.jsonl` | Per-request interactive-plane usage. `model`, `provider`, `capability`, `operation`, real+estimated tokens. The journal is per app channel: the miner probes both and picks the newest. Override with `--journal <path>` or `$DISCOVERY_TOKEN_JOURNAL`. |
 | B | `<ws>/.discovery/engine/clio/checkpoint/*/*/*/*/conversation_history.json` → `SESSION_SHUTDOWN` | Per-model rollup with **cost** (premium units). Subset of E. |
 | C | `<ws>/.discovery/engine/copilot-cli/logs/*/*/copilot-stdout.log` | Per-prompt ACP `usage{}` + model catalog with **billing multipliers**. |
 | D | `<ws>/.discovery/engine-runs/*/*/meta.json` | Complete engine prompt text + `adapterKind`. |

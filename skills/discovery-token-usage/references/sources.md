@@ -4,7 +4,7 @@
 
 | # | Source | What it gives |
 |---|---|---|
-| **A** | `~/Library/Application Support/DiscoveryApp/telemetry/token-usage.jsonl` | Per-request interactive-plane usage: `model`, `provider`, `capability`, `operation`, real + estimated tokens, `tokenSource`, `latencyMs`, `requestId`, `sessionId`. |
+| **A** | `~/Library/Application Support/DiscoveryApp{,Preview}/telemetry/token-usage.jsonl` (per app channel — stable *and* Preview are probed, newest wins; override with `--journal` or `$DISCOVERY_TOKEN_JOURNAL`) | Per-request interactive-plane usage: `model`, `provider`, `capability`, `operation`, real + estimated tokens, `tokenSource`, `latencyMs`, `requestId`, `sessionId`. |
 | **B** | `<ws>/.discovery/engine/clio/checkpoint/*/*/*/*/conversation_history.json` → `SESSION_SHUTDOWN` events | Per-model rollup with `cost` (premium units), `requests`, `input`, `output`, `reasoning`, `cache_read`, `cache_write`. |
 | **C** | `<ws>/.discovery/engine/copilot-cli/logs/*/*/copilot-stdout.log` | Per-prompt ACP `usage{}` blocks + `usage_update` context events + full model catalog with billing multipliers. |
 | **E** | `<ws>/.discovery/engine/clio/instances/*/clio-stderr.log` | Per-invocation Copilot SDK `input`/`output`/`cache_read`/`cache_write`. **Superset of B — this is Clio ground truth.** |

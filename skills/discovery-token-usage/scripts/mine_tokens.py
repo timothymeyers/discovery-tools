@@ -6,7 +6,7 @@ read-out. Cost/billing-multiplier data is FEATURE-FLAGGED behind --with-cost
 and is never shown unless explicitly requested.
 
 Sources:
-  A. ~/Library/Application Support/DiscoveryApp/telemetry/token-usage.jsonl
+  A. ~/Library/Application Support/DiscoveryApp{,Preview}/telemetry/token-usage.jsonl
   B. <ws>/.discovery/engine/clio/checkpoint/*/*/*/*/conversation_history.json  (SESSION_SHUTDOWN model_metrics)
   C. <ws>/.discovery/engine/copilot-cli/logs/*/*/copilot-stdout.log            (ACP prompt-result usage)
   D. <ws>/.discovery/engine-runs/*/*/meta.json                                 (engine prompts)
@@ -19,6 +19,12 @@ Usage:
   mine_tokens.py <workspace> --with-cost            # add cost columns (feature flag)
   mine_tokens.py <workspace> --report <path.md>     # also emit markdown report
   mine_tokens.py <workspace> --json <path.json>     # override JSON dataset path
+  mine_tokens.py <workspace> --journal <path.jsonl> # override the TokenJournal path
+
+The TokenJournal lives under a per-app-channel directory, so a Preview install
+writes somewhere the stable install never does. Resolution order:
+--journal, then $DISCOVERY_TOKEN_JOURNAL, then the newest journal that exists
+across the known channels.
 """
 import argparse
 import collections
@@ -35,9 +41,12 @@ MULTIPLIER_PATH = os.path.join(SKILL_DIR, "references", "billing_multipliers.jso
 
 # Set from argparse in main()
 WS = os.getcwd()
-JOURNAL = os.path.expanduser(
-    "~/Library/Application Support/DiscoveryApp/telemetry/token-usage.jsonl"
-)
+# Discovery App writes its TokenJournal under a per-channel support directory.
+# Stable and Preview installs never share one, so both have to be probed.
+APP_CHANNELS = ("DiscoveryApp", "DiscoveryAppPreview")
+JOURNAL_ENV_VAR = "DISCOVERY_TOKEN_JOURNAL"
+JOURNAL = None
+JOURNAL_CANDIDATES = []
 WITH_COST = False
 REPORT_PATH = None
 JSON_PATH = None
@@ -124,28 +133,69 @@ def recover_fragment(line):
     return d if ("realInputTokens" in d or "estimatedInputTokens" in d) else None
 
 
-def mine_journal():
+def journal_candidates():
+    """Default TokenJournal paths, one per known Discovery App channel."""
+    return [os.path.expanduser(
+        f"~/Library/Application Support/{channel}/telemetry/token-usage.jsonl")
+        for channel in APP_CHANNELS]
+
+
+def resolve_journal(explicit=None, env=None):
+    """Pick the TokenJournal to mine.
+
+    Precedence: an explicit path (--journal), then $DISCOVERY_TOKEN_JOURNAL,
+    then the most recently written journal that exists across the app
+    channels. Returns (path_or_None, candidates_probed); the path is None only
+    when none of the candidate journals exist on disk.
+    """
+    env = os.environ if env is None else env
+    override = explicit or env.get(JOURNAL_ENV_VAR)
+    if override:
+        resolved = os.path.abspath(os.path.expanduser(override))
+        return resolved, [resolved]
+    candidates = journal_candidates()
+    existing = [p for p in candidates if os.path.exists(p)]
+    if not existing:
+        return None, candidates
+    # Deterministic when several channels are installed: newest journal wins,
+    # ties broken by path so the choice never depends on filesystem ordering.
+    existing.sort(key=lambda p: (os.path.getmtime(p), p), reverse=True)
+    return existing[0], candidates
+
+
+def mine_journal(path=None):
+    """Read the TokenJournal.
+
+    Returns (rows, bad, recovered, state) where state is 'missing' (no journal
+    file at all — interactive usage is unknown, not zero), 'corrupt' (nothing
+    usable survived, but lines were dropped), 'empty' (journal present with no
+    records) or 'ok'.
+    """
     rows, bad, recovered = [], 0, 0
-    if not os.path.exists(JOURNAL):
-        return rows, bad, recovered
-    for line in open(JOURNAL, encoding="utf-8", errors="replace"):
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            d = json.loads(line)
-        except Exception:
-            bad += 1
-            frag = recover_fragment(line)
-            if frag:
-                frag["_recovered"] = True
-                rows.append(frag)
-                recovered += 1
-            continue
-        if "_sentinel" in d:
-            continue
-        rows.append(d)
-    return rows, bad, recovered
+    path = JOURNAL if path is None else path
+    if not path or not os.path.exists(path):
+        return rows, bad, recovered, "missing"
+    with open(path, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                d = json.loads(line)
+            except Exception:
+                bad += 1
+                frag = recover_fragment(line)
+                if frag:
+                    frag["_recovered"] = True
+                    rows.append(frag)
+                    recovered += 1
+                continue
+            if "_sentinel" in d:
+                continue
+            rows.append(d)
+    if rows:
+        return rows, bad, recovered, "ok"
+    return rows, bad, recovered, ("corrupt" if bad else "empty")
 
 
 def j_in(d):
@@ -581,10 +631,17 @@ def per_agent_acp(acp):
 
 def main():
     # ---- A
-    rows_journal, bad, recovered = mine_journal()
+    rows_journal, bad, recovered, journal_state = mine_journal()
     hdr(f"A. TokenJournal  ({len(rows_journal)} records | {bad} corrupt lines, "
         f"{recovered} salvaged by fragment recovery)")
-    _v(f"   path: {JOURNAL}")
+    if journal_state == "missing":
+        _v(f"   path: NOT FOUND — probed: {', '.join(JOURNAL_CANDIDATES)}")
+        _v("   interactive usage is UNKNOWN (not zero). Pass --journal or set "
+           f"${JOURNAL_ENV_VAR} if the journal lives elsewhere.")
+    else:
+        _v(f"   path: {JOURNAL}"
+           + {"empty": "  (present but empty)",
+              "corrupt": "  (present, but no line was readable)"}.get(journal_state, ""))
     real_journal, idle_journal, placeholder_journal = classify_journal(rows_journal)
     if idle_journal:
         _v(f"   ⚠ suppressed {len(idle_journal):,} records matching Discovery App "
@@ -811,6 +868,11 @@ def main():
             "generated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             "with_cost": WITH_COST,
             "journal": rows_journal,
+            "journal_source": {
+                "path": JOURNAL,
+                "state": journal_state,
+                "candidates": list(JOURNAL_CANDIDATES),
+            },
             "clio_shutdown": [{"instance": k[0], "sessionId": k[1], "model": k[2], **v}
                               for k, v in best.items()],
             "acp_usage": acp,
@@ -838,7 +900,7 @@ def main():
         stderr_rows=stderr_rows, best=best, acp=acp, prompts=prompts,
         real_journal=real_journal, idle_journal=idle_journal,
         placeholder_journal=placeholder_journal,
-        embeds=embeds,
+        embeds=embeds, journal_state=journal_state,
     )
 
     if REPORT_PATH:
@@ -857,7 +919,8 @@ def _humanize(n):
 
 
 def _terse_summary(*, stderr_rows, best, acp, prompts, real_journal,
-                   idle_journal, placeholder_journal, embeds):
+                   idle_journal, placeholder_journal, embeds,
+                   journal_state="ok"):
     """Always-visible top-line read-out. Kept intentionally short."""
     # --- Clio per-model: ASSISTANT_MESSAGE gives ~100% attribution coverage
     # (matches stderr output within ~0.2% in observed workspaces, catches
@@ -964,8 +1027,18 @@ def _terse_summary(*, stderr_rows, best, acp, prompts, real_journal,
               f" · {hit:>5.1f}% cached{cost_suffix}")
 
     print()
-    print(f"Interactive             {inter_total[0]:,} calls · "
-          f"{_humanize(inter_total[1])} in / {_humanize(inter_total[2])} out")
+    if journal_state == "missing":
+        print("Interactive             UNKNOWN — TokenJournal not found "
+              "(this is not the same as zero usage)")
+        for c in JOURNAL_CANDIDATES:
+            print(f"    probed: {c}")
+        print(f"    pass --journal <path> or set ${JOURNAL_ENV_VAR} to point at it")
+    else:
+        suffix = {"empty": " (journal present but empty)",
+                  "corrupt": " (journal present but every line was unreadable)"
+                  }.get(journal_state, "")
+        print(f"Interactive             {inter_total[0]:,} calls · "
+              f"{_humanize(inter_total[1])} in / {_humanize(inter_total[2])} out{suffix}")
     if inter_agg:
         print("  per-model:")
     for m, v in sorted(inter_agg.items(), key=lambda x: -x[1][1]):
@@ -1021,6 +1094,11 @@ def _parse_args():
                    help="Also emit a markdown report to this path.")
     p.add_argument("--json", metavar="PATH", dest="json_path",
                    help="Override output path for the normalized JSON dataset.")
+    p.add_argument("--journal", metavar="PATH",
+                   help="Override the TokenJournal path (source A). Defaults to the "
+                        "newest token-usage.jsonl across the Discovery App and "
+                        "Discovery App Preview support directories. Also settable "
+                        f"via ${JOURNAL_ENV_VAR}.")
     p.add_argument("--verbose", "-v", action="store_true",
                    help="Also print the full detailed source tables (A/B/C/D/E/F/G/H/H2). "
                         "By default only the terse summary is printed.")
@@ -1033,6 +1111,7 @@ if __name__ == "__main__":
     WITH_COST = args.with_cost
     REPORT_PATH = os.path.abspath(os.path.expanduser(args.report)) if args.report else None
     JSON_PATH = os.path.abspath(os.path.expanduser(args.json_path)) if args.json_path else None
+    JOURNAL, JOURNAL_CANDIDATES = resolve_journal(args.journal)
     VERBOSE = args.verbose
     if not os.path.isdir(os.path.join(WS, ".discovery")):
         print(f"ERROR: {WS}/.discovery/ not found. Pass a Discovery workspace root.",
