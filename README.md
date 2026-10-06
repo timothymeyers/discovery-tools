@@ -54,6 +54,12 @@ Tools this catalog makes discoverable but does **not** bundle. No third-party
 source code is vendored in this repository — each entry is a pointer plus the
 metadata an agent needs to evaluate, install, and drive the tool.
 
+Listing is **not** an endorsement. These are third-party tools, unreviewed and
+caveat emptor — nothing here is warranted to work as documented. Each entry's
+`verified.scope` tells you how far the checking actually went: `tested` means
+the pinned install was run and verified, `metadata-only` means the entry was
+derived from reading the pinned tree and nothing was executed.
+
 | Tool | Author | License | Pointer skill |
 |---|---|---|---|
 | [`hullrad-axi`](https://github.com/davenovelli-pnnl/hullrad-axi) — hydrodynamic properties (mass, translational/rotational diffusion) from a PDB or mmCIF structure, wrapping HullRad 10.2 | Dave Novelli (PNNL) | MIT AND Unlicense | — |

@@ -69,7 +69,8 @@
       "verified": {
         "date": "2026-09-22",
         "commit": "167b641cffeedfc8b3df9154f999fa951f950649",
-        "method": "Installed from the pinned commit into a throwaway npm prefix, confirmed 'osti-axi --version' reported 0.1.0, and ran a live read-only search against OSTI.GOV."
+        "method": "Installed from the pinned commit into a throwaway npm prefix, confirmed 'osti-axi --version' reported 0.1.0, and ran a live read-only search against OSTI.GOV.",
+        "scope": "tested"
       }
     },
     {
@@ -143,7 +144,8 @@
       "verified": {
         "date": "2026-09-29",
         "commit": "318001db8c7472e9740726c79b7cf23d1eb68ab6",
-        "method": "METADATA ONLY — the install steps above have NOT been executed end-to-end. The pinned commit was cloned and read (package.json bin/engines/postinstall, README command surface, LICENSE, THIRD_PARTY_NOTICES.md), and every field here was derived from that tree. 'verify' and 'verifyExpect' come from the upstream README and package.json version, not from an observed run. Re-verify by installing into a throwaway npm prefix and running 'hullrad-axi doctor --structure <file>' before relying on this entry."
+        "method": "The pinned commit was cloned and read (package.json bin/engines/postinstall, README command surface, LICENSE, THIRD_PARTY_NOTICES.md), and every field here was derived from that tree. The install steps have NOT been executed end-to-end: 'verify' and 'verifyExpect' come from the upstream README and package.json version, not from an observed run. Re-verify by installing into a throwaway npm prefix and running 'hullrad-axi doctor --structure <file>' before relying on this entry.",
+        "scope": "metadata-only"
       }
     }
   ]
