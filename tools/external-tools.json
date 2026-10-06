@@ -69,7 +69,83 @@
       "verified": {
         "date": "2026-09-22",
         "commit": "167b641cffeedfc8b3df9154f999fa951f950649",
-        "method": "Installed from the pinned commit into a throwaway npm prefix, confirmed 'osti-axi --version' reported 0.1.0, and ran a live read-only search against OSTI.GOV."
+        "method": "Installed from the pinned commit into a throwaway npm prefix, confirmed 'osti-axi --version' reported 0.1.0, and ran a live read-only search against OSTI.GOV.",
+        "scope": "tested"
+      }
+    },
+    {
+      "name": "hullrad-axi",
+      "description": "Hydrodynamic property estimation from a PDB or mmCIF structure for agents. Wraps an unmodified copy of HullRad 10.2 and returns compact TOON output — amino-acid count, molecular mass, and translational/rotational diffusion coefficients and radii. Read-only with respect to the input structure: it never mutates or uploads the caller's coordinates, and it performs no network calls after installation.",
+      "repository": "https://github.com/davenovelli-pnnl/hullrad-axi",
+      "author": {
+        "name": "Dave Novelli",
+        "organization": "Pacific Northwest National Laboratory",
+        "url": "https://github.com/davenovelli-pnnl"
+      },
+      "license": "MIT AND Unlicense",
+      "licenseNotes": "The AXI wrapper is MIT (PNNL). The bundled HullRadV10.2.py is Patrick Fleming's, dedicated to the public domain under the Unlicense. See THIRD_PARTY_NOTICES.md upstream. Cite Fleming & Fleming, Biophysical Journal 114 (2018) 856-869, doi:10.1016/j.bpj.2018.01.002 when reporting results.",
+      "bundled": false,
+      "trustLevel": "third-party-unreviewed",
+      "requiresConfirmation": true,
+      "kind": "cli",
+      "bin": ["hullrad-axi"],
+      "interface": {
+        "type": "axi",
+        "spec": "https://axi.md/",
+        "output": "toon",
+        "exitCodes": { "0": "success", "1": "error", "2": "usage error" }
+      },
+      "runtimePrerequisites": {
+        "node": ">=20",
+        "npm": "*",
+        "network": "required during installation only",
+        "platforms": ["macos-x64", "macos-arm64", "linux-x64", "linux-arm64", "windows-x64"],
+        "python": "not required on the host — the postinstall script provisions Python 3.11 in an isolated environment via a pinned uv download from Astral"
+      },
+      "install": {
+        "type": "npm-global-github",
+        "sourceRef": "318001db8c7472e9740726c79b7cf23d1eb68ab6",
+        "sourceRefType": "commit",
+        "steps": [
+          "npm install -g --install-links --allow-scripts=github:davenovelli-pnnl/hullrad-axi github:davenovelli-pnnl/hullrad-axi#318001db8c7472e9740726c79b7cf23d1eb68ab6"
+        ],
+        "verify": "hullrad-axi --version",
+        "verifyExpect": "0.1.0",
+        "notes": [
+          "Upstream has no git tags, no GitHub releases, and is not published to npm, so a commit SHA is the only immutable locator. The '#<sha>' suffix on the package spec is what pins the install; without it npm resolves the default branch, which moves.",
+          "'--install-links' makes npm copy the GitHub package instead of linking a temporary checkout. Omitting it leaves the global bin pointing at a checkout npm may reclaim.",
+          "'--allow-scripts' explicitly permits this package's postinstall Python setup script so npm does not warn about an unreviewed lifecycle script. That script downloads uv from Astral and provisions Python 3.11 — it is real third-party code execution with network egress, so obtain explicit user consent first.",
+          "'npm install -g' places a binary on the user's PATH. Uninstall with 'npm uninstall -g hullrad-axi'.",
+          "Structures are caller-supplied; the package ships no sample PDB/mmCIF files. 'hullrad-axi doctor --structure <file>' is the end-to-end smoke test.",
+          "Set AXI_PYTHON to override the provisioned interpreter. Any override must already have NumPy and SciPy."
+        ]
+      },
+      "commands": [
+        { "name": "doctor", "usage": "hullrad-axi doctor [--structure <pdb-or-cif>] [--engine <script>] [--timeout <seconds>]", "summary": "Check the bundled engine and provisioned Python environment; with --structure, run a full calculation as an end-to-end test." },
+        { "name": "inspect", "usage": "hullrad-axi inspect --structure <pdb-or-cif>", "summary": "Report a structure's path, format, size, SHA-256, and PDB coordinate-record count. Does not run HullRad." },
+        { "name": "fields", "usage": "hullrad-axi fields", "summary": "List every result key accepted by --fields, marking defaults and the native HullRad label." },
+        { "name": "run", "usage": "hullrad-axi run --structure <pdb-or-cif> [--out-dir <new-dir>] [--fields <names|all>] [--show-native]", "summary": "Calculate one structure. --out-dir preserves an input snapshot, native logs, normalized results, and a JSON manifest." },
+        { "name": "batch", "usage": "hullrad-axi batch --out-dir <new-dir> <structure...> [--fields <names|all>] [--show-native]", "summary": "Run several structures in sequence, writing a separate record per structure under a new --out-dir." }
+      ],
+      "documentation": "https://github.com/davenovelli-pnnl/hullrad-axi/blob/318001db8c7472e9740726c79b7cf23d1eb68ab6/README.md",
+      "keywords": [
+        "hullrad",
+        "hydrodynamics",
+        "diffusion-coefficient",
+        "translational-diffusion",
+        "rotational-diffusion",
+        "protein-structure",
+        "pdb",
+        "mmcif",
+        "biophysics",
+        "axi",
+        "ai-for-science"
+      ],
+      "verified": {
+        "date": "2026-09-29",
+        "commit": "318001db8c7472e9740726c79b7cf23d1eb68ab6",
+        "method": "The pinned commit was cloned and read (package.json bin/engines/postinstall, README command surface, LICENSE, THIRD_PARTY_NOTICES.md), and every field here was derived from that tree. The install steps have NOT been executed end-to-end: 'verify' and 'verifyExpect' come from the upstream README and package.json version, not from an observed run. Re-verify by installing into a throwaway npm prefix and running 'hullrad-axi doctor --structure <file>' before relying on this entry.",
+        "scope": "metadata-only"
       }
     }
   ]

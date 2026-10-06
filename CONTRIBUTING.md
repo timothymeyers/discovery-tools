@@ -134,9 +134,22 @@ CI additionally enforces:
   installing. These tools execute on the user's machine.
 - `install.sourceRef` pinned to a **full 40-character commit SHA** (or a tag).
   Never a moving branch.
-- `install.steps` and `install.verify` present — and **actually tested**. Install
-  the tool from the pinned ref into a throwaway prefix and confirm the verify
-  command succeeds before you commit the entry. Record what you did in `verified`.
+- `install.steps` and `install.verify` present, and a `verified` block that
+  **honestly states its own scope**. These entries are pointers, not
+  endorsements — this catalog makes no guarantee that a third-party tool works
+  as documented. What it does guarantee is that a reader can tell how much
+  checking actually happened.
+
+  Set `verified.scope` to one of:
+
+  - `"tested"` — you installed the tool from the pinned ref into a throwaway
+    prefix and the `install.verify` command succeeded. Say what you ran.
+  - `"metadata-only"` — you read the pinned tree (`package.json`, README,
+    LICENSE) and derived the fields from it, but did **not** execute the
+    install. Say so plainly, and say what a re-verifier should run.
+
+  `"tested"` is better and worth doing when the install is cheap. It is not a
+  merge gate; a dishonest `verified` block is the only real failure here.
 - If you set `relatedSkill`, that skill must exist, must link the upstream
   repository, and must contain the same pinned SHA. This stops the registry and
   the skill from drifting apart.

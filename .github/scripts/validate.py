@@ -406,6 +406,21 @@ def check_external_tools():
         if not install.get("verify"):
             err(f"external tool {n!r}: install.verify is required")
 
+        # These entries are pointers, not endorsements — a tool is NOT required
+        # to have been installed and run before it is listed. What is required
+        # is that the entry says which it is, so nobody mistakes a read of the
+        # upstream tree for an observed working install.
+        verified = t.get("verified") or {}
+        scope = verified.get("scope")
+        if scope not in ("tested", "metadata-only"):
+            err(
+                f"external tool {n!r}: verified.scope must be 'tested' (pinned install "
+                f"run and install.verify succeeded) or 'metadata-only' (derived from "
+                f"reading the pinned tree, nothing executed) — got {scope!r}"
+            )
+        if not verified.get("method"):
+            err(f"external tool {n!r}: verified.method is required — say what you actually did")
+
         # A referenced pointer skill must exist and agree on the pinned ref.
         rel_skill = t.get("relatedSkill")
         if rel_skill:
