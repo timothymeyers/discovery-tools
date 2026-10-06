@@ -159,6 +159,55 @@ to reach for the tool. Write your own prose. Do not copy upstream documentation
 wholesale; link to the upstream README **at the pinned commit** for the
 authoritative reference, and summarize only what the agent needs.
 
+## Adding an external catalog
+
+To point at **someone else's skill catalog**, add an entry to
+[`tools/external-catalogs.json`](tools/external-catalogs.json) — not to
+`external-tools.json`. The two are deliberately separate: that registry is for
+installable CLI binaries and its `install.steps` / `install.verify` contract is
+meaningless for a catalog, where nothing lands on `PATH` and there is no
+`--version` to run.
+
+Required fields: `name`, `description`, `repository`, `license`, `author`, and
+`format`. CI additionally enforces:
+
+- `bundled: false` and `requiresConfirmation: true`, as for tools.
+- `safety.autoInstall: false` plus non-empty `safety.notes`. A catalog ships
+  prompts your agent will follow and scripts it may run — write down what a
+  human needs to know before any of it loads.
+- `sourceRef` pinned to a **full 40-character commit SHA** (or a tag), with a
+  matching `sourceRefType`. The type is required: CI cannot check a ref for
+  immutability without knowing what it claims to be, and an unlabelled
+  `"sourceRef": "main"` is exactly what the pin exists to forbid.
+- `format.ghSkillInstallable` present, and **checked, not assumed**. `gh skill`
+  discovery supports the flat `skills/<name>/SKILL.md` layout *and* the scoped
+  `skills/<scope>/<name>/SKILL.md` layout, and a single skill can be installed
+  by its exact path:
+
+  ```bash
+  gh skill install OWNER/REPO skills/<scope>/<name> --pin <sha>
+  ```
+
+  So a nested catalog is **not** inherently uninstallable. Compare the catalog's
+  real layout against the conventions the CLI currently supports, and record the
+  exact install form in `format.notes`. Note that an unpinned `gh skill install`
+  resolves the latest release tag and falls back to the default branch — if
+  upstream has no tags, say so and tell users to pass `--pin`.
+- `license` must describe the **whole tree**, not just the root LICENSE. If
+  subtrees carry their own licenses, say `Mixed (per-skill)`, keep the root
+  license under `rootLicense`, link the upstream `NOTICE`, and spell out the
+  known exceptions in `licenseNotes`. A single SPDX string on a mixed catalog
+  tells a reader something false about every skill it does not cover.
+- `repository` is the **authoritative upstream**. If the catalog is also
+  published through a read-only mirror, put that under `mirror` (with its own
+  `url` and pinned `sourceRef`) rather than overwriting `repository` — and
+  re-compare the two SHAs whenever you move a pin, since a mirror can lag.
+- The README must link **both** the upstream and any mirror. Which one you
+  foreground is a presentation choice; dropping one is not.
+
+Do **not** write a pointer skill for a catalog that already ships its own
+discovery skill. Record it under `discovery` instead and link it.
+
 ## Manifests
 
 Two files must stay byte-identical: `.github/plugin/marketplace.json` and
