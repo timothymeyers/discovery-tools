@@ -9,7 +9,7 @@ Read-only, loopback-only, standard library only.
     python3 discovery_dashboard.py [--port 8787] [--workspace .]
     python3 discovery_dashboard.py --once | --json | --html out.html
 
-Source checksum: fd06e62b988c7688
+Source checksum: c235ac7833646f32
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
 
 # Bounded cold-tail read. Never rescan a full history.
 TAIL_BYTES = 512 * 1024
@@ -31,6 +31,14 @@ TAIL_BYTES = 512 * 1024
 # Seconds of tolerance when matching an observed process start time against the
 # recorded one. Wider than clock jitter, far narrower than a plausible reuse.
 PID_START_TOLERANCE_S = 90
+
+TERMINAL_ENGINE_STATES = {
+    "aborted", "cancelled", "canceled", "complete", "completed", "done", "error",
+    "failed", "failure", "finished", "stopped", "succeeded", "success", "terminated",
+}
+SLEEP_DEADLINE_KEYS = {
+    "sleepuntil", "wakeat", "wakeupat", "wakedeadline", "scheduledwakeat",
+}
 
 DONE_STATUS = "complete"
 AWAITING_STATUS = "executiondone"
@@ -97,6 +105,13 @@ def _parse_iso(value):
     text = value.strip()
     if text.endswith("Z"):
         text = text[:-1] + "+00:00"
+    # Python 3.9 accepts only 3 or 6 fractional digits. Discovery emits variable
+    # precision, so normalize every fraction to microseconds.
+    text = re.sub(
+        r"\.(\d+)(?=(?:[+-]\d\d:\d\d)?$)",
+        lambda match: "." + (match.group(1) + "000000")[:6],
+        text,
+    )
     try:
         dt = datetime.fromisoformat(text)
     except ValueError:
@@ -104,6 +119,142 @@ def _parse_iso(value):
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt
+
+
+def _nested_values(value):
+    """Yield nested mappings/lists from a structured acknowledgement."""
+    yield value
+    if isinstance(value, dict):
+        for child in value.values():
+            for nested in _nested_values(child):
+                yield nested
+    elif isinstance(value, list):
+        for child in value:
+            for nested in _nested_values(child):
+                yield nested
+
+
+def _sleep_deadline(value):
+    """Return the first valid, normalized wake deadline in structured data."""
+    for nested in _nested_values(value):
+        if not isinstance(nested, dict):
+            continue
+        for key, candidate in nested.items():
+            if str(key).replace("_", "").lower() not in SLEEP_DEADLINE_KEYS:
+                continue
+            parsed = _parse_iso(candidate)
+            if parsed:
+                return _iso(parsed)
+    return None
+
+
+def _structured_json(content):
+    """Yield (label, value) for each JSON payload in an event body.
+
+    `label` is only the prose between the previous payload and this one — not
+    the whole body. Discovery writes a tool result as a name followed by its
+    fenced payload (`**engine-sleep**` then the JSON), so the name has to come
+    from prose; but scoping it to the immediately preceding segment stops a
+    mention attached to one block from vouching for a different block further
+    down the same body.
+    """
+    if not isinstance(content, str):
+        return []
+    pairs = []
+    cursor = 0
+    for match in re.finditer(r"```(?:json)?\s*(.*?)```", content, re.I | re.S):
+        label = content[cursor:match.start()]
+        cursor = match.end()
+        try:
+            pairs.append((label, json.loads(match.group(1))))
+        except (TypeError, ValueError):
+            pass
+    stripped = content.strip()
+    if not pairs and stripped.startswith(("{", "[")):
+        try:
+            pairs.append(("", json.loads(stripped)))
+        except (TypeError, ValueError):
+            pass
+    return pairs
+
+
+def _successful_sleep_ack(event):
+    """Return a deadline from a successful structured engine-sleep result.
+
+    The tool name, the success flag, and the deadline must all come from the
+    SAME payload (or the prose immediately introducing it). Scanning the whole
+    event body for the tool name instead would let a mention anywhere in a
+    multi-block result vouch for an unrelated JSON block that happens to carry
+    `success: true` and a timestamp.
+    """
+    if _norm_status(event.get("kind")) != "actionapplied":
+        return None
+    for label, value in _structured_json(event.get("content")):
+        mappings = [v for v in _nested_values(value) if isinstance(v, dict)]
+        tool_named = any(
+            str(mapping.get(key, "")).lower() == "engine-sleep"
+            for mapping in mappings for key in ("tool", "toolName", "name")
+        )
+        if not tool_named:
+            scope = label + json.dumps(value)
+            tool_named = bool(
+                re.search(r"(?<![\w-])engine-sleep(?![\w-])", scope, re.I)
+            )
+        failed = any(
+            mapping.get("success") is False
+            or mapping.get("isError") is True
+            or str(mapping.get("status", "")).lower()
+            in ("error", "failed", "failure")
+            for mapping in mappings
+        )
+        success = any(
+            mapping.get("success") is True
+            or mapping.get("isError") is False
+            or str(mapping.get("status", "")).lower() in ("ok", "success", "succeeded")
+            for mapping in mappings
+        )
+        if tool_named and success and not failed:
+            deadline = _sleep_deadline(value)
+            if deadline:
+                return deadline
+    return None
+
+
+def _recorded_sleep(instance_dir, completed_at):
+    """Return the latest-cycle recorded wake deadline, if one is trustworthy."""
+    lines, _ = _tail_lines(instance_dir / "output.jsonl")
+    events = []
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(event, dict):
+            events.append(event)
+
+    done_indexes = [
+        index for index, event in enumerate(events)
+        if _norm_status(event.get("kind")) == "done"
+    ]
+    if not done_indexes:
+        # No cycle has closed, so there is no "latest completed cycle" to read.
+        # Scanning the whole log here would accept an in-flight acknowledgement
+        # and contradict the basis string this evidence is reported under.
+        return None
+    cycle_start = done_indexes[-2] + 1 if len(done_indexes) > 1 else 0
+    cycle_end = done_indexes[-1] + 1
+
+    best = None
+    for event in events[cycle_start:cycle_end]:
+        deadline = _successful_sleep_ack(event)
+        timestamp = _parse_iso(event.get("timestamp"))
+        if not deadline or not timestamp:
+            continue
+        if completed_at and timestamp > completed_at:
+            continue
+        if best is None or timestamp > best[0]:
+            best = (timestamp, deadline)
+    return best[1] if best else None
 
 
 def _norm_status(value):
@@ -496,18 +647,50 @@ class Collector:
 
     def _engine_record(self, meta, definition_dir, instance_dir):
         completed_at = meta.get("completedAt")
+        completed_dt = _parse_iso(completed_at)
         pid = meta.get("ownerProcessId")
         proc_state, proc_detail = verify_process(pid, meta.get("ownerProcessStartedAt"))
+        reported_state = _norm_status(meta.get("state"))
+        recorded_wake_at = _sleep_deadline(meta)
+        sleep_basis = "wake deadline recorded in meta.json" if recorded_wake_at else None
+        if not recorded_wake_at:
+            recorded_wake_at = _recorded_sleep(instance_dir, completed_dt)
+            if recorded_wake_at:
+                sleep_basis = "latest completed cycle acknowledged engine-sleep"
 
-        # completedAt outranks every other signal.
-        if completed_at:
-            state, why = "finished", "completedAt is set"
+        wake_dt = _parse_iso(recorded_wake_at)
+        wake_pending = bool(wake_dt and wake_dt > _utcnow())
+
+        if completed_at and reported_state in TERMINAL_ENGINE_STATES:
+            state, why = "finished", "completedAt and terminal state %s" % meta.get("state")
         elif proc_state == "live":
-            state, why = "running", proc_detail
+            if wake_pending:
+                state, why = "sleeping", "%s; scheduled wake %s" % (
+                    sleep_basis, recorded_wake_at)
+            elif reported_state == "paused":
+                state, why = "paused", "recorded state is Paused; " + proc_detail
+            elif reported_state in ("idle", "sleeping") or recorded_wake_at:
+                state, why = "idle", (
+                    "recorded wake deadline expired; awaiting fresh evidence"
+                    if recorded_wake_at else "recorded state is %s" % meta.get("state")
+                )
+            else:
+                state, why = "running", proc_detail
+        elif completed_at and not wake_pending:
+            # The cycle ended, nothing is scheduled to wake it, and there is no
+            # live owner that could. Requiring a recognised terminal `state`
+            # here would regress every older or differently-spelled record to
+            # "unknown" — the sleeping-engine case this check exists to catch
+            # needs a pending wake, and there isn't one.
+            state, why = "finished", (
+                "completedAt with no pending wake and no live owner (recorded state %r); %s"
+                % (meta.get("state"), proc_detail)
+            )
         elif proc_state == "dead":
             state, why = "stopped", proc_detail
         else:
-            # Explicitly unknown. Age is never used to infer a stall.
+            # Preserve uncertainty when the owner cannot be attributed to this
+            # run. A shared host process alone is not worker-health evidence.
             state, why = "unknown", proc_detail
 
         output_path = instance_dir / "output.jsonl"
@@ -533,6 +716,7 @@ class Collector:
             "processState": proc_state,
             "liveness": state,
             "livenessBasis": why,
+            "recordedWakeAt": recorded_wake_at,
             # Named to make its epistemic status unmistakable at the call site.
             "logLastWrittenAt": log_written_at,
             "isCopilotCli": (meta.get("adapterKind") or "").lower() == "copilot-cli",
@@ -1570,6 +1754,8 @@ INDEX_HTML = r'''<!DOCTYPE html>
     border: 1px solid var(--line); color: var(--dim); white-space: nowrap;
   }
   .pill.running { color: var(--ok); border-color: var(--ok); }
+  .pill.sleeping { color: var(--accent); border-color: var(--accent); }
+  .pill.idle, .pill.paused { color: var(--warn); border-color: var(--warn); }
   .pill.finished { color: var(--info); border-color: var(--info); }
   .pill.stopped { color: var(--bad); border-color: var(--bad); }
   .pill.unknown { color: var(--unknown); border-color: var(--unknown); }
@@ -1711,13 +1897,17 @@ function renderOverview(s) {
   // Engines.
   const engines = (s.engines && s.engines.engines) || [];
   const live = engines.filter(e => e.liveness === "running").length;
+  const sleeping = engines.filter(e => e.liveness === "sleeping").length;
+  const idle = engines.filter(e => e.liveness === "idle").length;
+  const paused = engines.filter(e => e.liveness === "paused").length;
   const unknown = engines.filter(e => e.liveness === "unknown").length;
   const engineRows = engines.length ? `<ul class="list">` + engines.slice(0, 12).map(e =>
     `<li><span class="ttl">${esc(e.definitionId || "")}
       <span class="sub mono">${esc((e.instanceId || "").slice(0, 12))}</span>
       <div class="sub">${esc(e.adapterKind || "")}${
         e.startedAt ? " · started " + esc(ago(e.startedAt)) : ""}${
-        e.livenessBasis ? " · " + esc(e.livenessBasis) : ""}</div></span>
+        e.livenessBasis ? " · " + esc(e.livenessBasis) : ""}${
+        e.recordedWakeAt ? " · recorded wake " + esc(e.recordedWakeAt) : ""}</div></span>
       <span class="pill ${esc(e.liveness)}">${esc(e.liveness)}</span></li>`
   ).join("") + `</ul>` : empty("No engine runs recorded.");
 
@@ -1760,10 +1950,13 @@ function renderOverview(s) {
     ${panel("Awaiting review", (T.awaitingReview || []).length,
       taskList(T.awaitingReview, { showStatus: true, emptyText: "Nothing awaiting review." }),
       `<code>executionDone</code> — finished executing, <b>not</b> approved.`)}
-    ${panel("Engines", `${live} running · ${unknown} unknown · ${engines.length} total`,
+    ${panel("Engines", `${live} running · ${sleeping} sleeping · ${idle} idle · ${
+        paused} paused · ${unknown} unknown · ${engines.length} total`,
       engineRows,
       `<b>unknown</b> is a real state, not a soft failure: it means the recorded pid could
-       not be verified against its recorded start time. Age is never used to infer a stall.`)}
+       not be verified against its recorded start time. Sleeping uses recorded scheduling
+       evidence, not a live scheduler query; its deadline may differ slightly from the
+       supervisor's actual wake time. Age is never used to infer a stall.`)}
   </div>`);
 
   // Agents.
@@ -1960,6 +2153,13 @@ function renderMethodology(s) {
     <li>Engine liveness requires the recorded pid to exist <b>and</b> its observed start time
         to match the record. A matching pid with a different start time is pid reuse and
         reports <b>unknown</b>. A live shared host does not prove a worker is healthy.</li>
+    <li><code>completedAt</code> marks the end of an execution turn. It means
+        <b>finished</b> only with a terminal recorded state. Sleeping is inferred from a
+        recorded wake deadline or a successful structured <code>engine-sleep</code>
+        acknowledgement in the latest completed cycle.</li>
+    <li>A recorded wake deadline is not a live scheduler query and may differ slightly from
+        the supervisor's actual wake time. After it expires, the engine reports <b>idle</b>
+        until fresh evidence arrives; it is not guessed to be running or finished.</li>
     <li>Agent runs are deduplicated across an alias graph of every id they are known by, not
         a single run id.</li>
     <li>CLIO <b>investigations</b> are listed with the state each run recorded for

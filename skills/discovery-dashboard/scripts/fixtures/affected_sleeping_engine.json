@@ -1,0 +1,22 @@
+{
+  "meta": {
+    "instanceId": "sanitized-recurring-run",
+    "definitionId": "mission-control",
+    "adapterKind": "copilot-cli",
+    "state": "Idle",
+    "startedAt": "2026-09-24T13:44:42.123456789Z",
+    "completedAt": "2026-09-24T14:19:42.123456789Z"
+  },
+  "events": [
+    {
+      "kind": "ActionApplied",
+      "timestamp": "2026-09-24T14:19:41.123456789Z",
+      "content": "**engine-sleep**\n```json\n{\"success\":true,\"result\":{\"sleepUntil\":\"2099-09-24T14:44:42.123456789Z\"}}\n```"
+    },
+    {
+      "kind": "Done",
+      "timestamp": "2026-09-24T14:19:42.123456789Z",
+      "content": "Execution turn complete."
+    }
+  ]
+}
