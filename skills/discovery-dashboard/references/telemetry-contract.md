@@ -65,6 +65,7 @@ Evaluated in strict precedence order:
 | owner verified, recorded state `Paused` | `paused` |
 | owner verified, recorded state `Idle`, or an expired wake deadline | `idle` |
 | owner verified, no inactive-state evidence | `running` |
+| `completedAt`, no pending wake, no live owner | `finished` |
 | owner verifiably dead | `stopped` |
 | owner identity cannot be verified | `unknown` |
 
@@ -89,13 +90,27 @@ A live shared host process does not prove any individual worker is healthy.
 Runtime owner pid cannot be attributed to a run without a verified mapping.
 
 **Idle is not finished.** In recurring engines, `completedAt` marks the end of an
-execution turn. It is terminal only when `state` also records a terminal lifecycle
+execution turn. It is terminal when `state` also records a terminal lifecycle
 state (`Completed`, `Failed`, `Stopped`, `Terminated`, `Cancelled`, or equivalent).
+
+**But an unrecognised state spelling must not become `unknown`.** A record with
+`completedAt`, no pending wake deadline, and no live owner is `finished`
+regardless of how — or whether — `state` was written. Nothing is left that could
+advance it, and older records predate the `state` field entirely. Gating purely
+on a hand-maintained list of terminal spellings would silently reclassify the
+most common case in the archive. The sleeping case this rule exists to protect
+always has a pending wake, so it is unaffected.
 
 Sleeping requires recorded scheduling evidence: either a parseable future wake
 deadline in `meta.json`, or a successful, structured `engine-sleep`
 acknowledgement from the latest completed cycle. Proposed calls, failed results,
 malformed results, and acknowledgements from earlier cycles are not evidence.
+Neither is an acknowledgement from a cycle that has not closed: with no `Done`
+event in the log there is no completed cycle to read, and an in-flight call is
+not a scheduled wake. Within one event body the tool name, the success flag, and
+the deadline must all come from the same payload, or from the prose directly
+introducing it — a mention attached to one JSON block never vouches for
+another.
 Once a recorded deadline expires, the state is `idle` pending fresh evidence,
 never automatically `running` or `finished`.
 

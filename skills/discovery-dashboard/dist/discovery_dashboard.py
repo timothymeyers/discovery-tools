@@ -9,7 +9,7 @@ Read-only, loopback-only, standard library only.
     python3 discovery_dashboard.py [--port 8787] [--workspace .]
     python3 discovery_dashboard.py --once | --json | --html out.html
 
-Source checksum: ee56a828c2ee9a9e
+Source checksum: c235ac7833646f32
 """
 
 from __future__ import annotations
@@ -33,7 +33,8 @@ TAIL_BYTES = 512 * 1024
 PID_START_TOLERANCE_S = 90
 
 TERMINAL_ENGINE_STATES = {
-    "cancelled", "canceled", "completed", "failed", "finished", "stopped", "terminated",
+    "aborted", "cancelled", "canceled", "complete", "completed", "done", "error",
+    "failed", "failure", "finished", "stopped", "succeeded", "success", "terminated",
 }
 SLEEP_DEADLINE_KEYS = {
     "sleepuntil", "wakeat", "wakeupat", "wakedeadline", "scheduledwakeat",
@@ -148,36 +149,57 @@ def _sleep_deadline(value):
 
 
 def _structured_json(content):
-    """Parse JSON objects from an event body without treating prose as evidence."""
+    """Yield (label, value) for each JSON payload in an event body.
+
+    `label` is only the prose between the previous payload and this one — not
+    the whole body. Discovery writes a tool result as a name followed by its
+    fenced payload (`**engine-sleep**` then the JSON), so the name has to come
+    from prose; but scoping it to the immediately preceding segment stops a
+    mention attached to one block from vouching for a different block further
+    down the same body.
+    """
     if not isinstance(content, str):
         return []
-    candidates = re.findall(r"```(?:json)?\s*(.*?)```", content, re.I | re.S)
-    stripped = content.strip()
-    if stripped.startswith(("{", "[")):
-        candidates.append(stripped)
-    values = []
-    for candidate in candidates:
+    pairs = []
+    cursor = 0
+    for match in re.finditer(r"```(?:json)?\s*(.*?)```", content, re.I | re.S):
+        label = content[cursor:match.start()]
+        cursor = match.end()
         try:
-            values.append(json.loads(candidate))
+            pairs.append((label, json.loads(match.group(1))))
         except (TypeError, ValueError):
             pass
-    return values
+    stripped = content.strip()
+    if not pairs and stripped.startswith(("{", "[")):
+        try:
+            pairs.append(("", json.loads(stripped)))
+        except (TypeError, ValueError):
+            pass
+    return pairs
 
 
 def _successful_sleep_ack(event):
-    """Return a deadline from a successful structured engine-sleep result."""
+    """Return a deadline from a successful structured engine-sleep result.
+
+    The tool name, the success flag, and the deadline must all come from the
+    SAME payload (or the prose immediately introducing it). Scanning the whole
+    event body for the tool name instead would let a mention anywhere in a
+    multi-block result vouch for an unrelated JSON block that happens to carry
+    `success: true` and a timestamp.
+    """
     if _norm_status(event.get("kind")) != "actionapplied":
         return None
-    content = event.get("content")
-    values = _structured_json(content)
-    for value in values:
+    for label, value in _structured_json(event.get("content")):
         mappings = [v for v in _nested_values(value) if isinstance(v, dict)]
-        tool_named = bool(re.search(r"(?<![\w-])engine-sleep(?![\w-])",
-                                    content or "", re.I))
-        tool_named = tool_named or any(
+        tool_named = any(
             str(mapping.get(key, "")).lower() == "engine-sleep"
             for mapping in mappings for key in ("tool", "toolName", "name")
         )
+        if not tool_named:
+            scope = label + json.dumps(value)
+            tool_named = bool(
+                re.search(r"(?<![\w-])engine-sleep(?![\w-])", scope, re.I)
+            )
         failed = any(
             mapping.get("success") is False
             or mapping.get("isError") is True
@@ -214,8 +236,13 @@ def _recorded_sleep(instance_dir, completed_at):
         index for index, event in enumerate(events)
         if _norm_status(event.get("kind")) == "done"
     ]
+    if not done_indexes:
+        # No cycle has closed, so there is no "latest completed cycle" to read.
+        # Scanning the whole log here would accept an in-flight acknowledgement
+        # and contradict the basis string this evidence is reported under.
+        return None
     cycle_start = done_indexes[-2] + 1 if len(done_indexes) > 1 else 0
-    cycle_end = done_indexes[-1] + 1 if done_indexes else len(events)
+    cycle_end = done_indexes[-1] + 1
 
     best = None
     for event in events[cycle_start:cycle_end]:
@@ -631,17 +658,13 @@ class Collector:
             if recorded_wake_at:
                 sleep_basis = "latest completed cycle acknowledged engine-sleep"
 
+        wake_dt = _parse_iso(recorded_wake_at)
+        wake_pending = bool(wake_dt and wake_dt > _utcnow())
+
         if completed_at and reported_state in TERMINAL_ENGINE_STATES:
             state, why = "finished", "completedAt and terminal state %s" % meta.get("state")
-        elif proc_state == "dead":
-            state, why = "stopped", proc_detail
-        elif proc_state != "live":
-            # Preserve uncertainty when the owner cannot be attributed to this
-            # run. A shared host process alone is not worker-health evidence.
-            state, why = "unknown", proc_detail
-        else:
-            wake_dt = _parse_iso(recorded_wake_at)
-            if wake_dt and wake_dt > _utcnow():
+        elif proc_state == "live":
+            if wake_pending:
                 state, why = "sleeping", "%s; scheduled wake %s" % (
                     sleep_basis, recorded_wake_at)
             elif reported_state == "paused":
@@ -653,6 +676,22 @@ class Collector:
                 )
             else:
                 state, why = "running", proc_detail
+        elif completed_at and not wake_pending:
+            # The cycle ended, nothing is scheduled to wake it, and there is no
+            # live owner that could. Requiring a recognised terminal `state`
+            # here would regress every older or differently-spelled record to
+            # "unknown" — the sleeping-engine case this check exists to catch
+            # needs a pending wake, and there isn't one.
+            state, why = "finished", (
+                "completedAt with no pending wake and no live owner (recorded state %r); %s"
+                % (meta.get("state"), proc_detail)
+            )
+        elif proc_state == "dead":
+            state, why = "stopped", proc_detail
+        else:
+            # Preserve uncertainty when the owner cannot be attributed to this
+            # run. A shared host process alone is not worker-health evidence.
+            state, why = "unknown", proc_detail
 
         output_path = instance_dir / "output.jsonl"
         log_written_at = None

@@ -237,6 +237,65 @@ class EngineLivenessTests(TempWorkspaceCase):
         self.assertEqual(
             self.ws.collect()["engines"]["engines"][0]["liveness"], "running")
 
+    def test_completed_at_still_finishes_an_unrecognised_terminal_state(self):
+        # "Complete" (no trailing d) is not in TERMINAL_ENGINE_STATES' original
+        # spelling set. Without a live owner and without a pending wake there is
+        # nothing left that could run, so this must not degrade to "unknown".
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "state": "Complete", "startedAt": "2026-09-20T03:22:29+00:00",
+            "completedAt": "2026-09-20T16:49:02+00:00",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "finished")
+
+    def test_completed_at_with_no_state_key_still_finishes(self):
+        # Older records carry no `state` at all.
+        self.ws.engine_run("mission-control", "i1", {
+            "instanceId": "i1", "definitionId": "mission-control",
+            "startedAt": "2026-09-20T03:22:29+00:00",
+            "completedAt": "2026-09-20T16:49:02+00:00",
+        })
+        self.assertEqual(
+            self.ws.collect()["engines"]["engines"][0]["liveness"], "finished")
+
+    def test_sleep_ack_does_not_borrow_a_tool_name_from_another_block(self):
+        # The engine-sleep mention belongs to the FIRST payload, which carries no
+        # deadline. The second payload has success and a wakeAt but is a
+        # different tool's result, so it must not be read as a sleep.
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Idle", completedAt="2026-09-24T14:19:42Z"), events=[
+                {"kind": "ActionApplied", "timestamp": "2026-09-24T14:19:41Z",
+                 "content": (
+                     "**engine-sleep**\n"
+                     '```json\n{"success":false,"error":"refused"}\n```\n'
+                     "**schedule-report**\n"
+                     '```json\n{"success":true,"result":'
+                     '{"wakeAt":"2099-09-24T14:44:42Z"}}\n```'
+                 )},
+                {"kind": "Done", "timestamp": "2026-09-24T14:19:42Z",
+                 "content": "Execution turn complete."},
+            ])
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertEqual(engine["liveness"], "idle")
+        self.assertIsNone(engine["recordedWakeAt"])
+
+    def test_sleep_ack_is_ignored_when_no_cycle_has_closed(self):
+        # No Done event means no completed cycle, so an in-flight
+        # acknowledgement is not yet evidence of a scheduled wake.
+        self.ws.engine_run("mission-control", "i1", self._verified_meta(
+            state="Running"), events=[
+                {"kind": "ActionApplied", "timestamp": "2026-09-24T14:19:41Z",
+                 "content": (
+                     "**engine-sleep**\n"
+                     '```json\n{"success":true,"result":'
+                     '{"sleepUntil":"2099-09-24T14:44:42Z"}}\n```'
+                 )},
+            ])
+        engine = self.ws.collect()["engines"]["engines"][0]
+        self.assertIsNone(engine["recordedWakeAt"])
+        self.assertEqual(engine["liveness"], "running")
+
     def test_failed_terminal_state_is_finished_historically(self):
         self.ws.engine_run("mission-control", "i1", {
             "instanceId": "i1", "definitionId": "mission-control",
