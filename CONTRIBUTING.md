@@ -162,11 +162,29 @@ Required fields: `name`, `description`, `repository`, `license`, `author`, and
 - `safety.autoInstall: false` plus non-empty `safety.notes`. A catalog ships
   prompts your agent will follow and scripts it may run — write down what a
   human needs to know before any of it loads.
-- `sourceRef` pinned to a **full 40-character commit SHA**, so a citation names
-  an exact revision.
-- `format.ghSkillInstallable` present. If the catalog does not use the flat
-  `skills/<name>/SKILL.md` layout, `gh skill install` will not work against it
-  and the entry must say so rather than let a user assume otherwise.
+- `sourceRef` pinned to a **full 40-character commit SHA** (or a tag), with a
+  matching `sourceRefType`. The type is required: CI cannot check a ref for
+  immutability without knowing what it claims to be, and an unlabelled
+  `"sourceRef": "main"` is exactly what the pin exists to forbid.
+- `format.ghSkillInstallable` present, and **checked, not assumed**. `gh skill`
+  discovery supports the flat `skills/<name>/SKILL.md` layout *and* the scoped
+  `skills/<scope>/<name>/SKILL.md` layout, and a single skill can be installed
+  by its exact path:
+
+  ```bash
+  gh skill install OWNER/REPO skills/<scope>/<name> --pin <sha>
+  ```
+
+  So a nested catalog is **not** inherently uninstallable. Compare the catalog's
+  real layout against the conventions the CLI currently supports, and record the
+  exact install form in `format.notes`. Note that an unpinned `gh skill install`
+  resolves the latest release tag and falls back to the default branch — if
+  upstream has no tags, say so and tell users to pass `--pin`.
+- `license` must describe the **whole tree**, not just the root LICENSE. If
+  subtrees carry their own licenses, say `Mixed (per-skill)`, keep the root
+  license under `rootLicense`, link the upstream `NOTICE`, and spell out the
+  known exceptions in `licenseNotes`. A single SPDX string on a mixed catalog
+  tells a reader something false about every skill it does not cover.
 - `repository` is the **authoritative upstream**. If the catalog is also
   published through a read-only mirror, put that under `mirror` (with its own
   `url` and pinned `sourceRef`) rather than overwriting `repository` — and

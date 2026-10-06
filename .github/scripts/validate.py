@@ -397,9 +397,17 @@ def check_external_tools():
 
         install = t.get("install") or {}
         ref = install.get("sourceRef")
+        ref_type = install.get("sourceRefType")
         if not ref:
             err(f"external tool {n!r}: install.sourceRef is required — pin to a tag or commit")
-        elif install.get("sourceRefType") == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
+        elif ref_type not in ("commit", "tag"):
+            # Same trap as the catalog registry: guarding the SHA check behind
+            # `== "commit"` lets an unlabelled branch name through untouched.
+            err(
+                f"external tool {n!r}: install.sourceRefType must be 'commit' or 'tag', "
+                f"got {ref_type!r} — an unlabelled ref cannot be checked for immutability"
+            )
+        elif ref_type == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
             err(f"external tool {n!r}: install.sourceRef must be a full 40-char commit SHA")
         if not install.get("steps"):
             err(f"external tool {n!r}: install.steps is required")
@@ -533,9 +541,12 @@ def check_external_catalogs():
         fmt = c.get("format") or {}
         if fmt and fmt.get("ghSkillInstallable") is None:
             err(
-                f"external catalog {n!r}: format.ghSkillInstallable is required — a "
-                f"nested catalog cannot be installed with 'gh skill install', and "
-                f"silently letting a user assume otherwise is a real failure mode"
+                f"external catalog {n!r}: format.ghSkillInstallable is required — "
+                f"whether a catalog can be installed with 'gh skill install' is the "
+                f"first thing a user needs to know, and leaving it unstated invites "
+                f"them to guess. Check the layout against the discovery conventions "
+                f"'gh skill' actually supports; do not assume a nested catalog is "
+                f"excluded, because scoped layouts are supported."
             )
 
         # The README is the human-facing half of this registry. Require EVERY
@@ -556,7 +567,13 @@ def check_external_catalogs():
 
 
 def _check_ref(name, obj, label):
-    """A pinned ref must be immutable: a full commit SHA, never a branch."""
+    """A pinned ref must be immutable: a full commit SHA or a tag, never a branch.
+
+    The type is required, not inferred. Guarding the SHA check behind
+    `sourceRefType == "commit"` would mean `{"sourceRef": "main"}` with the type
+    omitted passes silently — which is exactly the moving ref the pin exists to
+    forbid. Absence of a claim is not a claim of absence.
+    """
     ref = obj.get("sourceRef")
     if not ref:
         err(
@@ -564,7 +581,15 @@ def _check_ref(name, obj, label):
             f"commit so a citation names an exact revision"
         )
         return
-    if obj.get("sourceRefType") == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
+    ref_type = obj.get("sourceRefType")
+    if ref_type not in ("commit", "tag"):
+        err(
+            f"external catalog {name!r}: {label}Type must be 'commit' or 'tag', "
+            f"got {ref_type!r} — an unlabelled ref cannot be checked for "
+            f"immutability, and a branch is never an acceptable pin"
+        )
+        return
+    if ref_type == "commit" and not re.fullmatch(r"[0-9a-f]{40}", ref):
         err(f"external catalog {name!r}: {label} must be a full 40-char commit SHA")
 
 

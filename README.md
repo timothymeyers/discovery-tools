@@ -78,7 +78,7 @@ nothing from them.
 
 | Catalog | Author | License | Layout |
 |---|---|---|---|
-| [`genesis-skills`](https://gitlab.osti.gov/genesis/genesis-skills/) — Agent Skills for science and engineering from the DOE **Genesis Mission**: HPC job submission (Slurm, PBS, Aurora, Frontier, Perlmutter), plasma simulation (Gkeyll, GS2), scientific-data metadata and schemas, AI evaluation, AI safety, research data-movement APIs, literature search, multi-agent systems | ModCon / Genesis Mission | BSD-2-Clause | Nested (`skills/<domain>/<skill>/`) — **not** `gh skill install`-able |
+| [`genesis-skills`](https://gitlab.osti.gov/genesis/genesis-skills/) — Agent Skills for science and engineering from the DOE **Genesis Mission**: HPC job submission (Slurm, PBS, Aurora, Frontier, Perlmutter), plasma simulation (Gkeyll, GS2), scientific-data metadata and schemas, AI evaluation, AI safety, research data-movement APIs, literature search, multi-agent systems | ModCon / Genesis Mission | **Mixed — per skill** (root BSD-2-Clause) | Mostly scoped (`skills/<scope>/<skill>/`), some flat — `gh skill install`-able (29 of 36) |
 
 The link above is the OSTI GitLab project, which is a **read-only mirror**. Its
 own README designates [`AI-ModCon/genesis-skills`](https://github.com/AI-ModCon/genesis-skills)
@@ -86,16 +86,39 @@ on GitHub as the authoritative upstream for development, forks, issues, and
 pull requests — file things there. Both resolve to the same commit at the ref
 pinned in the registry.
 
-Because its skills are grouped one directory deeper than the flat
-`skills/<name>/SKILL.md` convention, `gh skill install` does not work against
-it. Upstream ships two routes instead: `unpack.sh`, which flattens skills into
-your agent's skills directory, and a bundled `skill-search` skill that explores
-the nested catalog in place without copying anything. **Prefer `skill-search`
-when you only want to look.**
+**Check the license of the individual skill, not the catalog.** The root is
+BSD-2-Clause, but upstream's [`NOTICE`](https://github.com/AI-ModCon/genesis-skills/blob/b7e8434f3cd15a0c8cb6cb0313942cd4b1d06cee/NOTICE)
+makes a subtree's own LICENSE authoritative over the root. At the pinned ref,
+`academy`, `baseeval-skills`, `hpc-skills`, and `literature-search` are
+Apache-2.0; `amsc-data-movement-api` declares MIT; and `basedata-skills` had no
+explicit license at all. Read the NOTICE before adopting a skill.
+
+Most skills are grouped by domain one level below `skills/`, which is the scoped
+`skills/<scope>/<name>/SKILL.md` convention — supported by `gh skill` alongside
+the flat form. Install one skill by its exact path:
+
+```bash
+gh skill install AI-ModCon/genesis-skills skills/hpc-skills/slurm --pin b7e8434f3cd15a0c8cb6cb0313942cd4b1d06cee
+```
+
+**Pass `--pin`.** An unpinned install resolves the latest release tag and falls
+back to the default branch; upstream has no tags and no releases, so without it
+you silently track a moving `main`.
+
+Seven of the 36 skills are the exception: the `lm-eval-harness-skills` group
+sits *three* levels below `skills/`, and `gh skill` handles one level of scope,
+not two. Those seven need `unpack.sh` or `skill-search`. The other 29 install
+normally.
+
+Upstream also ships two routes of its own: `unpack.sh`, which flattens *every*
+skill into your agent's skills directory, and a bundled `skill-search` skill
+that explores the catalog in place without copying anything. **Prefer a
+per-skill `gh skill install`, or `skill-search` when you only want to look** —
+installing 36 unreviewed skills to obtain one is not a reasonable trade.
 
 The machine-readable registry is [`tools/external-catalogs.json`](tools/external-catalogs.json),
-which carries the pinned refs, the layout caveat, the domain inventory, and
-safety metadata.
+which carries the pinned refs, the per-subtree licensing notes, the domain
+inventory, and safety metadata.
 
 > [!CAUTION]
 > A third-party **skill catalog is a wider surface than a third-party tool**.

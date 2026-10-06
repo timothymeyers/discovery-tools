@@ -23,7 +23,7 @@
         "organization": "Genesis Mission (U.S. Department of Energy)",
         "url": "https://gitlab.osti.gov/genesis"
       },
-      "license": "BSD-2-Clause",
+      "license": "Mixed (per-skill)",
       "licenseNotice": "https://github.com/AI-ModCon/genesis-skills/blob/b7e8434f3cd15a0c8cb6cb0313942cd4b1d06cee/NOTICE",
       "bundled": false,
       "trustLevel": "third-party-unreviewed",
@@ -31,13 +31,26 @@
       "kind": "skills-catalog",
       "format": {
         "spec": "https://agentskills.io/specification",
-        "layout": "nested",
-        "skillPathPattern": "skills/<domain>/<skill>/SKILL.md",
-        "ghSkillInstallable": false,
+        "layout": "mixed",
+        "skillPathPatterns": [
+          "skills/<scope>/<skill>/SKILL.md",
+          "skills/<skill>/SKILL.md"
+        ],
+        "ghSkillInstallable": true,
         "notes": [
-          "Skills are grouped by domain one level deeper than the flat `skills/<name>/SKILL.md` convention that `gh skill install` and the plugin marketplaces expect. It is an Agent Skills catalog, but it is NOT installable with `gh skill install AI-ModCon/genesis-skills <skill>`.",
-          "Upstream supplies two intended routes instead: `./unpack.sh --target <dir> --mode copy|symlink`, which flattens skills into an agent's skills directory, and a bundled `skill-search` skill that discovers the nested catalog in place without copying anything."
-        ]
+          "Most skills are grouped by domain one level below skills/, which is the scoped `skills/<scope>/<skill>/SKILL.md` convention; a few sit flat at `skills/<skill>/SKILL.md`. `gh skill` discovery supports BOTH forms, so this catalog IS installable.",
+          "Install a single skill by its exact path, which also skips a full tree traversal of a large repo: `gh skill install AI-ModCon/genesis-skills skills/hpc-skills/slurm`. A bare `<scope>/<skill>` argument is matched by name, not by path — pass the full `skills/...` path to be unambiguous.",
+          "Pin the install. `gh skill install` with no version resolves the latest release tag and falls back to the default branch; upstream has neither tags nor releases, so an unpinned install silently tracks a moving main. Use the `--pin` flag with the SHA recorded here.",
+          "Seven skills sit THREE levels below skills/ (skills/baseeval-skills/lm-eval-harness-skills/<skill>/SKILL.md). `gh skill` discovery handles one level of scope, not two, so those seven are not discoverable by name and not installable by path. Use unpack.sh or skill-search for them. The other 29 — 25 scoped, 3 flat, and skill-search itself at the repository root — install normally.",
+          "Upstream also supplies two of its own routes: `./unpack.sh --target <dir> --mode copy|symlink`, which flattens skills into an agent's skills directory, and a bundled `skill-search` skill that discovers the catalog in place without copying anything. Prefer a per-skill `gh skill install` or `skill-search` over unpack.sh — see safety.notes."
+        ],
+        "skillCounts": {
+          "total": 36,
+          "scoped": 25,
+          "flat": 3,
+          "repositoryRoot": 1,
+          "tooDeepForGhSkill": 7
+        }
       },
       "sourceRef": "b7e8434f3cd15a0c8cb6cb0313942cd4b1d06cee",
       "sourceRefType": "commit",
@@ -46,15 +59,51 @@
         "This catalog does not install, vendor, or execute anything from this pin. The ref exists so that an agent citing a genesis-skills skill can cite an exact revision."
       ],
       "domains": [
-        { "name": "academy", "path": "skills/academy", "summary": "Onboarding and teaching material for the catalog." },
-        { "name": "amsc-skills", "path": "skills/amsc-skills", "summary": "Research data movement and compute APIs: AMSC data-movement API, AMSC Python client, Globus Compute, I2 API, IRI API, skill-explorer." },
-        { "name": "basedata-skills", "path": "skills/basedata-skills", "summary": "Scientific data metadata and schemas: Croissant validator, datacard generator, HDMF schema builder, skill-creator, well-convert." },
-        { "name": "baseeval-skills", "path": "skills/baseeval-skills", "summary": "AI system evaluation: card-eval updater, lm-eval-harness, Perlmutter/NeMo evaluation workflows." },
-        { "name": "basesafe-skills", "path": "skills/basesafe-skills", "summary": "AI safety and assurance: agentic vulnerability scanning, AI fingerprinting, battleprint, uncertainty quantification, UQ metrics evaluation." },
-        { "name": "hpc-skills", "path": "skills/hpc-skills", "summary": "HPC job submission and site conventions: Aurora, Frontier, PBS, Perlmutter, Slurm." },
-        { "name": "literature-search", "path": "skills/literature-search", "summary": "Scientific literature retrieval. Overlaps this catalog's own osti-literature-search — compare before adopting both." },
-        { "name": "multi-agent-systems", "path": "skills/multi-agent-systems", "summary": "Patterns for coordinating multiple agents on a research task." },
-        { "name": "plasma-sim-skills", "path": "skills/plasma-sim-skills", "summary": "Plasma simulation codes: Gkeyll, GS2." }
+        {
+          "name": "academy",
+          "path": "skills/academy",
+          "summary": "Onboarding and teaching material for the catalog."
+        },
+        {
+          "name": "amsc-skills",
+          "path": "skills/amsc-skills",
+          "summary": "Research data movement and compute APIs: AMSC data-movement API, AMSC Python client, Globus Compute, I2 API, IRI API, skill-explorer."
+        },
+        {
+          "name": "basedata-skills",
+          "path": "skills/basedata-skills",
+          "summary": "Scientific data metadata and schemas: Croissant validator, datacard generator, HDMF schema builder, skill-creator, well-convert."
+        },
+        {
+          "name": "baseeval-skills",
+          "path": "skills/baseeval-skills",
+          "summary": "AI system evaluation: card-eval updater, lm-eval-harness, Perlmutter/NeMo evaluation workflows."
+        },
+        {
+          "name": "basesafe-skills",
+          "path": "skills/basesafe-skills",
+          "summary": "AI safety and assurance: agentic vulnerability scanning, AI fingerprinting, battleprint, uncertainty quantification, UQ metrics evaluation."
+        },
+        {
+          "name": "hpc-skills",
+          "path": "skills/hpc-skills",
+          "summary": "HPC job submission and site conventions: Aurora, Frontier, PBS, Perlmutter, Slurm."
+        },
+        {
+          "name": "literature-search",
+          "path": "skills/literature-search",
+          "summary": "Scientific literature retrieval. Overlaps this catalog's own osti-literature-search — compare before adopting both."
+        },
+        {
+          "name": "multi-agent-systems",
+          "path": "skills/multi-agent-systems",
+          "summary": "Patterns for coordinating multiple agents on a research task."
+        },
+        {
+          "name": "plasma-sim-skills",
+          "path": "skills/plasma-sim-skills",
+          "summary": "Plasma simulation codes: Gkeyll, GS2."
+        }
       ],
       "discovery": {
         "skill": "skill-search",
@@ -94,7 +143,9 @@
         "commit": "b7e8434f3cd15a0c8cb6cb0313942cd4b1d06cee",
         "method": "Read-only metadata verification. Queried the GitLab API (project 683) for visibility, default branch, tag list, tree, and HEAD commit, and the GitHub API for the upstream's license, visibility, and HEAD commit; confirmed both resolve to the same SHA. Enumerated skills/ at the pinned ref to confirm the nested layout and the nine domain groups, and read README.md and LICENSE at that ref. The repository was NOT cloned, unpack.sh was NOT run, and no skill from it was installed or executed.",
         "scope": "metadata-only"
-      }
+      },
+      "licenseNotes": "The repository root is BSD-2-Clause, but the root LICENSE is NOT authoritative for the whole tree. Upstream's NOTICE states that where a subdirectory carries its own LICENSE, that file supersedes the root for that subtree and its descendants. At the pinned ref: skills/academy, skills/baseeval-skills, skills/hpc-skills, and skills/literature-search each ship an Apache-2.0 LICENSE; the amsc-data-movement-api skill declares MIT in its SKILL.md frontmatter with no other licensing information for that subtree; and skills/basedata-skills had NO explicit license at the time of inclusion. Determine the license of the specific skill you intend to adopt by reading the pinned NOTICE and the nearest LICENSE above that skill. Do not rely on the root license.",
+      "rootLicense": "BSD-2-Clause"
     }
   ]
 }
