@@ -1,0 +1,1949 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <title>Engine Chat — Engine activity</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #002b36;
+      --cp-bg-elevated: #00252d;
+      --cp-surface: #00313b;
+      --cp-surface-soft: #073d47;
+      --cp-border: #164852;
+      --cp-border-strong: #2b6670;
+      --cp-text: #d7e0e2;
+      --cp-text-muted: #8fa7ab;
+      --cp-text-soft: #b7c8ca;
+      --cp-accent: #4ec9b0;
+      --cp-accent-hover: #65d8c2;
+      --cp-accent-soft: rgba(78, 201, 176, 0.14);
+      --cp-accent-fg: #001f27;
+      --cp-success: #4fd68b;
+      --cp-danger: #f48771;
+      --cp-warning: #dcdcaa;
+      --cp-link: #4fc1ff;
+      --cp-shadow: 0 18px 48px rgba(0, 13, 17, 0.42);
+      --cp-overlay: rgba(0, 43, 54, 0.9);
+      --cp-panel: rgba(0, 49, 59, 0.84);
+      --cp-panel-strong: rgba(0, 39, 48, 0.97);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(78, 201, 176, 0.16);
+    }
+    :root {
+      --cp-card-shadow: 0 0 2px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      background: var(--cp-bg);
+      color: var(--cp-text);
+      font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    button,
+    select,
+    textarea {
+      color: inherit;
+      font: inherit;
+    }
+
+    button,
+    summary,
+    select {
+      -webkit-tap-highlight-color: var(--cp-accent-soft);
+    }
+
+    button:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    summary:focus-visible {
+      outline: 2px solid var(--cp-accent);
+      outline-offset: 2px;
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100%;
+      background: var(--cp-bg);
+    }
+
+    .workspace-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 304px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .conversation-column {
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) auto;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .topbar {
+      position: relative;
+      z-index: 5;
+      border-bottom: 1px solid var(--cp-border);
+      background: var(--cp-panel-strong);
+    }
+
+    .topbar-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 16px;
+      align-items: center;
+      width: min(1320px, 100%);
+      margin: 0 auto;
+      padding: 12px 24px;
+    }
+
+    .engine-identity {
+      display: flex;
+      min-width: 0;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .engine-avatar {
+      display: grid;
+      flex: 0 0 auto;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 10px;
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .engine-heading {
+      min-width: 0;
+    }
+
+    .engine-title-row {
+      display: flex;
+      min-width: 0;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .engine-title {
+      overflow: hidden;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .run-status {
+      display: inline-flex;
+      flex: 0 0 auto;
+      gap: 6px;
+      align-items: center;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--cp-border-strong);
+    }
+
+    .status-dot.working,
+    .status-dot.waiting,
+    .status-dot.sleeping {
+      background: var(--cp-success);
+    }
+
+    .status-dot.needs-attention,
+    .status-dot.failed {
+      background: var(--cp-danger);
+    }
+
+    .status-dot.paused {
+      background: var(--cp-warning);
+    }
+
+    .status-dot.queued,
+    .status-dot.starting,
+    .status-dot.needs-permission {
+      background: var(--cp-warning);
+    }
+
+    .status-dot.working,
+    .status-dot.sleeping {
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+
+    .sync-line {
+      overflow: hidden;
+      margin-top: 1px;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .run-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .run-picker {
+      width: min(300px, 34vw);
+      height: 34px;
+      padding: 0 32px 0 10px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+      cursor: pointer;
+      font-size: 13px;
+    }
+
+    .live-button,
+    .jump-button {
+      display: inline-flex;
+      gap: 7px;
+      align-items: center;
+      justify-content: center;
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .live-button:hover,
+    .jump-button:hover {
+      border-color: var(--cp-border-strong);
+      background: var(--cp-surface-soft);
+    }
+
+    .live-button[hidden],
+    .jump-button[hidden] {
+      display: none;
+    }
+
+    .feed {
+      position: relative;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      scrollbar-color: var(--cp-border-strong) var(--cp-bg);
+    }
+
+    .feed-inner {
+      width: min(860px, 100%);
+      min-height: 100%;
+      margin: 0 auto;
+      padding: 28px 24px 36px;
+    }
+
+    .agent-rail {
+      min-width: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      border-left: 1px solid var(--cp-border);
+      background: var(--cp-bg-elevated);
+      scrollbar-color: var(--cp-border-strong) var(--cp-bg-elevated);
+    }
+
+    .agent-rail-inner {
+      padding: 20px 16px;
+    }
+
+    .agent-rail-header {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .agent-rail-eyebrow {
+      margin: 0 0 2px;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    .agent-rail-title {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .agent-count {
+      display: grid;
+      min-width: 25px;
+      height: 25px;
+      place-items: center;
+      padding: 0 7px;
+      border: 1px solid var(--cp-border);
+      border-radius: 999px;
+      background: var(--cp-surface);
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .agent-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .agent-card {
+      padding: 12px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .agent-card-top {
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+    }
+
+    .agent-card-avatar {
+      display: grid;
+      width: 34px;
+      height: 34px;
+      place-items: center;
+      border: 1px solid var(--cp-accent);
+      border-radius: 10px;
+      background: var(--cp-accent-soft);
+      font-size: 17px;
+    }
+
+    .agent-card-heading {
+      min-width: 0;
+    }
+
+    .agent-card-name {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .agent-assignment {
+      color: var(--cp-accent);
+      font-weight: 650;
+    }
+
+    .agent-card-task {
+      display: -webkit-box;
+      overflow: hidden;
+      margin: 8px 0 0 44px;
+      color: var(--cp-text-soft);
+      font-size: 12px;
+      line-height: 1.45;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .agent-card-meta {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      margin: 9px 0 0 44px;
+      color: var(--cp-text-muted);
+      font-size: 11px;
+    }
+
+    .agent-card-meta .status-dot {
+      flex: 0 0 auto;
+    }
+
+    .agent-empty {
+      padding: 18px 14px;
+      border: 1px dashed var(--cp-border-strong);
+      border-radius: 16px;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      text-align: center;
+    }
+
+    .agent-rail-sync {
+      margin: 12px 2px 0;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+    }
+
+    .date-divider {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin: 0 0 24px;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .date-divider::before,
+    .date-divider::after {
+      height: 1px;
+      flex: 1;
+      background: var(--cp-border);
+      content: "";
+    }
+
+    .stream-intro {
+      display: grid;
+      grid-template-columns: 32px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+      margin-bottom: 18px;
+    }
+
+    .starting-prompt {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 32px;
+      gap: 10px;
+      align-items: start;
+      margin: 0 0 24px 72px;
+    }
+
+    .user-avatar {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border: 1px solid var(--cp-accent);
+      border-radius: 10px;
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .prompt-bubble {
+      padding: 12px 14px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px 4px 16px 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .prompt-label {
+      margin: 0 0 4px;
+      color: var(--cp-accent);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .prompt-label-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .prompt-label-row .prompt-label {
+      margin: 0;
+    }
+
+    .message-time {
+      color: var(--cp-text-muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .prompt-text {
+      margin: 0;
+      color: var(--cp-text);
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .user-message-stack {
+      margin: 4px 0 16px;
+    }
+
+    .user-message-stack .starting-prompt {
+      margin-bottom: 10px;
+    }
+
+    .user-message-stack .starting-prompt:last-child {
+      margin-bottom: 0;
+    }
+
+    .user-message-stack.pending .prompt-bubble {
+      border-color: var(--cp-accent);
+      background: var(--cp-accent-soft);
+    }
+
+    .small-avatar {
+      display: grid;
+      width: 32px;
+      height: 32px;
+      place-items: center;
+      border: 1px solid var(--cp-border);
+      border-radius: 10px;
+      background: var(--cp-surface);
+      color: var(--cp-accent);
+      font-size: 12px;
+      font-weight: 700;
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .intro-copy {
+      padding-top: 2px;
+    }
+
+    .intro-copy strong {
+      display: block;
+      font-size: 14px;
+    }
+
+    .intro-copy span {
+      color: var(--cp-text-muted);
+      font-size: 13px;
+    }
+
+    .turn-thread {
+      overflow: hidden;
+      margin: 0 0 16px 44px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .turn-thread[open] {
+      border-color: var(--cp-border-strong);
+    }
+
+    .turn-summary {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 64px;
+      padding: 12px 16px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+
+    .turn-summary::-webkit-details-marker,
+    .section-summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .turn-summary:hover {
+      background: var(--cp-surface-soft);
+    }
+
+    .turn-title-block {
+      min-width: 0;
+    }
+
+    .turn-eyebrow {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 3px;
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .turn-live {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      color: var(--cp-success);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+    }
+
+    .turn-title {
+      overflow: hidden;
+      margin: 0;
+      font-size: 14px;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .turn-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .turn-chevron {
+      width: 16px;
+      height: 16px;
+      transition: transform 160ms ease;
+    }
+
+    .turn-thread[open] > .turn-summary .turn-chevron {
+      transform: rotate(180deg);
+    }
+
+    .turn-content {
+      border-top: 1px solid var(--cp-border);
+    }
+
+    .wake-line {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 16px;
+      padding: 10px 12px;
+      border-left: 3px solid var(--cp-accent);
+      border-radius: 0.625rem;
+      background: var(--cp-accent-soft);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .turn-chevron,
+    .inline-icon,
+    .timeline-marker svg {
+      display: block;
+      width: 15px;
+      height: 15px;
+    }
+
+    .event-stream {
+      position: relative;
+      padding: 0 16px 16px;
+    }
+
+    .event-stream::before {
+      position: absolute;
+      top: 0;
+      bottom: 18px;
+      left: 31px;
+      width: 1px;
+      background: var(--cp-border);
+      content: "";
+    }
+
+    .timeline-entry {
+      position: relative;
+      margin: 0;
+    }
+
+    .timeline-entry + .timeline-entry {
+      margin-top: 4px;
+    }
+
+    .timeline-entry > summary {
+      list-style: none;
+    }
+
+    .timeline-entry > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .timeline-row {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr) auto auto auto;
+      gap: 8px;
+      align-items: center;
+      min-height: 42px;
+      padding: 5px 8px 5px 0;
+      border-radius: 0.625rem;
+      font-size: 13px;
+    }
+
+    summary.timeline-row {
+      cursor: pointer;
+    }
+
+    .timeline-row:hover {
+      background: var(--cp-surface-soft);
+    }
+
+    .timeline-marker {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border: 1px solid var(--cp-border);
+      border-radius: 9px;
+      background: var(--cp-surface);
+      color: var(--cp-text-muted);
+    }
+
+    .timeline-marker.thinking {
+      color: var(--cp-accent);
+    }
+
+    .timeline-marker.observation {
+      color: var(--cp-link);
+    }
+
+    .timeline-marker.agent {
+      border-color: var(--cp-accent);
+      background: var(--cp-accent-soft);
+      color: var(--cp-accent);
+      font-size: 17px;
+    }
+
+    .timeline-marker.context {
+      background: var(--cp-surface-soft);
+      color: var(--cp-accent);
+    }
+
+    .timeline-copy {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .timeline-kind {
+      font-weight: 700;
+    }
+
+    .timeline-separator {
+      color: var(--cp-text-muted);
+    }
+
+    .timeline-time {
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .timeline-chevron {
+      width: 15px;
+      height: 15px;
+      color: var(--cp-text-muted);
+      transition: transform 160ms ease;
+    }
+
+    .timeline-entry[open] > .timeline-row .timeline-chevron {
+      transform: rotate(180deg);
+    }
+
+    .context-rollup > .timeline-row {
+      border: 1px solid var(--cp-border);
+      background: var(--cp-surface-soft);
+      font-weight: 650;
+    }
+
+    .context-rollup > .timeline-row:hover {
+      border-color: var(--cp-border-strong);
+    }
+
+    .rollup-count {
+      display: inline-flex;
+      margin-left: 7px;
+      padding: 1px 7px;
+      border: 1px solid var(--cp-border);
+      border-radius: 999px;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+      font-weight: 600;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    .rollup-children {
+      position: relative;
+      margin: 4px 8px 10px 42px;
+      padding: 6px 0 6px 12px;
+      border-left: 2px solid var(--cp-border);
+      border-radius: 0 0.625rem 0.625rem 0;
+      background: var(--cp-bg-elevated);
+    }
+
+    .rollup-children .timeline-row {
+      padding-right: 10px;
+    }
+
+    .agent-launch > .timeline-row {
+      background: var(--cp-accent-soft);
+      font-weight: 700;
+    }
+
+    .agent-launch > .timeline-row:hover {
+      background: var(--cp-highlight);
+    }
+
+    .timeline-detail {
+      margin: 0 8px 10px 42px;
+      padding: 10px 12px;
+      border-left: 2px solid var(--cp-border);
+      border-radius: 0 0.625rem 0.625rem 0;
+      background: var(--cp-bg-elevated);
+    }
+
+    .timeline-detail-label {
+      margin: 0 0 4px;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .timeline-detail-text {
+      margin: 0;
+      color: var(--cp-text-soft);
+      font-size: 13px;
+      line-height: 1.6;
+      overflow-wrap: anywhere;
+      white-space: pre-wrap;
+    }
+
+    .action-state {
+      display: grid;
+      width: 22px;
+      height: 22px;
+      place-items: center;
+      color: var(--cp-text-muted);
+      font-size: 13px;
+    }
+
+    .action-state.completed {
+      color: var(--cp-success);
+    }
+
+    .action-state.failed {
+      color: var(--cp-danger);
+      font-weight: 800;
+    }
+
+    .action-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid var(--cp-border);
+      border-top-color: var(--cp-accent);
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    .action-copy {
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .action-time {
+      color: var(--cp-text-muted);
+      font-size: 11px;
+    }
+
+    .timeline-sleep {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr);
+      gap: 8px;
+      padding: 6px 8px 2px 0;
+    }
+
+    .sleep-card {
+      overflow: hidden;
+      border: 1px solid var(--cp-border);
+      border-radius: 0.625rem;
+      background: var(--cp-bg-elevated);
+    }
+
+    .sleep-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 12px;
+    }
+
+    .sleep-title {
+      margin: 0;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sleep-reason {
+      overflow: hidden;
+      margin: 1px 0 0;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .sleep-countdown {
+      min-width: 56px;
+      font-family: Consolas, "Courier New", Courier, monospace;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .sleep-progress {
+      height: 3px;
+      background: var(--cp-border);
+    }
+
+    .sleep-progress-bar {
+      width: var(--sleep-progress, 0%);
+      height: 100%;
+      background: var(--cp-accent);
+      transition: width 240ms linear;
+    }
+
+    .jump-button {
+      position: absolute;
+      right: max(20px, calc((100% - 860px) / 2 + 24px));
+      bottom: 18px;
+      z-index: 4;
+      border-color: var(--cp-accent);
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+    }
+
+    .jump-button:hover {
+      border-color: var(--cp-accent-hover);
+      background: var(--cp-accent-hover);
+    }
+
+    .composer-region {
+      position: relative;
+      z-index: 5;
+      border-top: 1px solid var(--cp-border);
+      background: var(--cp-panel-strong);
+    }
+
+    .composer-inner {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      padding: 12px 24px 14px;
+    }
+
+    .composer-label-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 0 2px 7px;
+      color: var(--cp-text-muted);
+      font-size: 11px;
+      font-weight: 650;
+    }
+
+    .preview-badge {
+      padding: 1px 7px;
+      border: 1px solid var(--cp-border);
+      border-radius: 999px;
+      background: var(--cp-surface-soft);
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .composer-box {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 38px;
+      gap: 8px;
+      align-items: end;
+      padding: 8px;
+      border: 1px solid var(--cp-border-strong);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .composer-box textarea {
+      min-height: 38px;
+      max-height: 90px;
+      resize: none;
+      border: 0;
+      background: var(--cp-surface);
+      color: var(--cp-text-muted);
+      line-height: 1.45;
+      outline: 0;
+    }
+
+    .composer-box textarea:disabled {
+      cursor: not-allowed;
+      opacity: 1;
+    }
+
+    .send-button {
+      display: grid;
+      width: 38px;
+      height: 38px;
+      place-items: center;
+      border: 0;
+      border-radius: 10px;
+      background: var(--cp-border);
+      color: var(--cp-text-muted);
+      cursor: not-allowed;
+    }
+
+    .composer-note {
+      margin: 6px 2px 0;
+      color: var(--cp-text-muted);
+      font-size: 11px;
+    }
+
+    .composer-note + .composer-note {
+      margin-top: 2px;
+    }
+
+    .empty-state,
+    .error-state {
+      display: grid;
+      min-height: 45vh;
+      place-items: center;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .empty-card {
+      max-width: 460px;
+      padding: 28px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+    }
+
+    .empty-card h2 {
+      margin: 0 0 6px;
+      font-size: 17px;
+    }
+
+    .empty-card p {
+      margin: 0;
+      color: var(--cp-text-muted);
+      font-size: 13px;
+    }
+
+    .skeleton {
+      display: grid;
+      gap: 14px;
+      margin-left: 44px;
+    }
+
+    .skeleton-card {
+      height: 78px;
+      border: 1px solid var(--cp-border);
+      border-radius: 16px;
+      background: var(--cp-surface);
+      box-shadow: var(--cp-card-shadow);
+      animation: fade 1.4s ease-in-out infinite alternate;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      50% { opacity: 0.45; }
+    }
+
+    @keyframes fade {
+      to { opacity: 0.55; }
+    }
+
+    @media (max-width: 1050px) {
+      .workspace-body {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .agent-rail {
+        order: -1;
+        max-height: 164px;
+        border-bottom: 1px solid var(--cp-border);
+        border-left: 0;
+      }
+
+      .agent-rail-inner {
+        padding: 10px 16px 12px;
+      }
+
+      .agent-rail-header {
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .agent-rail-eyebrow,
+      .agent-rail-sync {
+        display: none;
+      }
+
+      .agent-list {
+        grid-auto-columns: minmax(240px, 300px);
+        grid-auto-flow: column;
+        overflow-x: auto;
+        padding-bottom: 2px;
+      }
+
+      .agent-card-task {
+        -webkit-line-clamp: 1;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .topbar-inner {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 10px 14px;
+      }
+
+      .run-controls {
+        width: 100%;
+      }
+
+      .run-picker {
+        width: 100%;
+        flex: 1;
+      }
+
+      .feed-inner {
+        padding: 20px 12px 28px;
+      }
+
+      .turn-thread,
+      .skeleton {
+        margin-left: 0;
+      }
+
+      .starting-prompt {
+        margin-left: 32px;
+      }
+
+      .stream-intro {
+        grid-template-columns: 1fr;
+      }
+
+      .small-avatar {
+        display: none;
+      }
+
+      .section-body {
+        padding-left: 16px;
+      }
+
+      .timeline-row {
+        grid-template-columns: 30px minmax(0, 1fr) auto auto;
+      }
+
+      .timeline-time {
+        display: none;
+      }
+
+      .sleep-countdown {
+        text-align: right;
+      }
+
+      .composer-inner {
+        padding: 10px 12px 12px;
+      }
+
+      .jump-button {
+        right: 12px;
+      }
+
+      .agent-rail {
+        max-height: 154px;
+      }
+
+      .agent-rail-inner {
+        padding-right: 12px;
+        padding-left: 12px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="engine-identity">
+          <div class="engine-avatar" aria-hidden="true">EC</div>
+          <div class="engine-heading">
+            <div class="engine-title-row">
+              <h1 class="engine-title" id="engine-title">Engine Chat</h1>
+              <span class="run-status" id="run-status">
+                <span class="status-dot" id="status-dot"></span>
+                <span id="status-label">Connecting</span>
+              </span>
+            </div>
+            <div class="sync-line" id="sync-line">Reading the latest engine-run logs…</div>
+          </div>
+        </div>
+        <div class="run-controls">
+          <label for="run-picker" class="sr-only" hidden>Choose an engine run</label>
+          <select class="run-picker" id="run-picker" aria-label="Choose an engine run">
+            <option>Loading runs…</option>
+          </select>
+          <button class="live-button" id="live-button" type="button" hidden>
+            <span class="status-dot working" aria-hidden="true"></span>
+            Follow live
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <div class="workspace-body">
+      <section class="conversation-column" aria-label="Engine conversation">
+        <main class="feed" id="feed" aria-live="polite" aria-busy="true">
+          <div class="feed-inner" id="feed-inner">
+            <div class="skeleton" aria-label="Loading engine activity">
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+              <div class="skeleton-card"></div>
+            </div>
+          </div>
+          <button class="jump-button" id="jump-button" type="button" hidden>Jump to latest ↓</button>
+        </main>
+
+        <footer class="composer-region">
+          <div class="composer-inner">
+            <div class="composer-label-row">
+              <span>Steering disabled</span>
+              <span class="preview-badge">0.1.0-experimental</span>
+            </div>
+            <div class="composer-box">
+              <textarea disabled aria-label="Steering is disabled" placeholder="Steering is disabled in this experimental release."></textarea>
+              <button class="send-button" type="button" disabled aria-label="Steering is disabled">
+                <svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <path d="m5 12 14-7-4 14-3-5-7-2Z"></path>
+                  <path d="m12 14 7-9"></path>
+                </svg>
+              </button>
+            </div>
+            <p class="composer-note">Local-only view: starting prompts and delegated prompts from local Discovery logs are visible. Raw action, output, and error payloads remain hidden.</p>
+            <p class="composer-note">Tested with Discovery 0.15.19 on macOS; other versions and platforms are untested.</p>
+          </div>
+        </footer>
+      </section>
+
+      <aside class="agent-rail" aria-labelledby="active-agents-title">
+        <div class="agent-rail-inner">
+          <header class="agent-rail-header">
+            <div>
+              <p class="agent-rail-eyebrow">Delegated work</p>
+              <h2 class="agent-rail-title" id="active-agents-title">Active Agents</h2>
+            </div>
+            <span class="agent-count" id="agent-count" aria-label="Active agent count">–</span>
+          </header>
+          <div class="agent-list" id="agent-list" aria-live="polite">
+            <div class="agent-empty">Checking agent activity…</div>
+          </div>
+          <p class="agent-rail-sync" id="agent-rail-sync">Reading session state…</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const POLL_INTERVAL_MS = 1500;
+      const RUN_LIST_INTERVAL_MS = 5000;
+      const AGENT_POLL_INTERVAL_MS = 2500;
+      const state = {
+        runs: [],
+        agents: [],
+        agentSignature: null,
+        recommendedKey: null,
+        selectedKey: null,
+        userSelected: false,
+        runData: null,
+        version: null,
+        loading: false,
+        loadingAgents: false,
+        following: true,
+        lastSyncAt: null,
+        openKeys: new Set(),
+        touchedKeys: new Set(),
+      };
+
+      const elements = {
+        feed: document.getElementById("feed"),
+        feedInner: document.getElementById("feed-inner"),
+        picker: document.getElementById("run-picker"),
+        engineTitle: document.getElementById("engine-title"),
+        statusDot: document.getElementById("status-dot"),
+        statusLabel: document.getElementById("status-label"),
+        syncLine: document.getElementById("sync-line"),
+        liveButton: document.getElementById("live-button"),
+        jumpButton: document.getElementById("jump-button"),
+        agentList: document.getElementById("agent-list"),
+        agentCount: document.getElementById("agent-count"),
+        agentRailSync: document.getElementById("agent-rail-sync"),
+      };
+
+      const icons = {
+        chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>',
+        thought: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M8.5 14.5A7 7 0 1 1 15.5 14.5C14.6 15.2 14 16.1 14 17h-4c0-.9-.6-1.8-1.5-2.5Z"></path></svg>',
+        work: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16v13H4z"></path><path d="M9 7V4h6v3"></path><path d="M4 12h16"></path></svg>',
+        observation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12s-3.5 6-9 6-9-6-9-6 3.5-6 9-6 9 6 9 6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>',
+        wake: '<svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2v3"></path><path d="m4.93 4.93 2.12 2.12"></path><path d="M2 12h3"></path><path d="m19.07 4.93-2.12 2.12"></path><path d="M19 12h3"></path><path d="M6 17h12"></path><path d="M8 21h8"></path><path d="M7 14a5 5 0 0 1 10 0"></path></svg>',
+        moon: '<svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20.5 14.4A8 8 0 0 1 9.6 3.5 8.5 8.5 0 1 0 20.5 14.4Z"></path></svg>',
+        context: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path><path d="M8 9h6M8 12h4"></path></svg>',
+        agent: '<span aria-hidden="true">🤖</span>',
+      };
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function keyFor(run) {
+        return `${run.definitionId}/${run.instanceId}`;
+      }
+
+      function selectedRun() {
+        return state.runs.find((run) => keyFor(run) === state.selectedKey) || null;
+      }
+
+      function statusClass(label) {
+        return String(label || "unknown").toLowerCase().replaceAll(" ", "-");
+      }
+
+      function effectiveRunStatus(data) {
+        if (!data) return "Connecting";
+        const latest = data.turns?.at(-1);
+        const until = dateValue(latest?.sleep?.until);
+        if (latest?.sleep?.status === "scheduled" && until && until.getTime() > Date.now()) {
+          return "Sleeping";
+        }
+        return data.run.stateLabel;
+      }
+
+      function updateHeaderStatus() {
+        if (!state.runData) return;
+        const label = effectiveRunStatus(state.runData);
+        elements.statusLabel.textContent = label;
+        elements.statusDot.className = `status-dot ${statusClass(label)}`;
+      }
+
+      function dateValue(value) {
+        const date = value ? new Date(value) : null;
+        return date && !Number.isNaN(date.getTime()) ? date : null;
+      }
+
+      function formatTime(value) {
+        const date = dateValue(value);
+        if (!date) return "";
+        return new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(date);
+      }
+
+      function formatDate(value) {
+        const date = dateValue(value);
+        if (!date) return "Engine run";
+        return new Intl.DateTimeFormat(undefined, {
+          weekday: "long",
+          month: "long",
+          day: "numeric",
+        }).format(date);
+      }
+
+      function relativeTime(value) {
+        const date = dateValue(value);
+        if (!date) return "just now";
+        const delta = Math.max(0, Date.now() - date.getTime());
+        const seconds = Math.floor(delta / 1000);
+        if (seconds < 5) return "just now";
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return formatDate(value);
+      }
+
+      function formatDuration(totalSeconds) {
+        const safe = Math.max(0, Math.round(Number(totalSeconds) || 0));
+        const minutes = Math.floor(safe / 60);
+        const seconds = safe % 60;
+        return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+      }
+
+      function formatElapsed(value) {
+        const date = dateValue(value);
+        if (!date) return "active";
+        const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+        if (seconds < 60) return "just started";
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m`;
+        const hours = Math.floor(minutes / 60);
+        const remainder = minutes % 60;
+        return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+      }
+
+      function isNearBottom() {
+        return elements.feed.scrollHeight - elements.feed.scrollTop - elements.feed.clientHeight < 150;
+      }
+
+      function scrollToLatest(behavior = "smooth") {
+        state.following = true;
+        elements.jumpButton.hidden = true;
+        elements.feed.scrollTo({ top: elements.feed.scrollHeight, behavior });
+      }
+
+      function detailOpen(key, defaultOpen) {
+        if (state.touchedKeys.has(key)) return state.openKeys.has(key);
+        return defaultOpen;
+      }
+
+      function openAttribute(key, defaultOpen) {
+        return detailOpen(key, defaultOpen) ? " open" : "";
+      }
+
+      function actionState(action) {
+        if (action.type !== "action" && action.type !== "group") {
+          return '<span class="action-state" aria-hidden="true"></span>';
+        }
+        if (action.status === "completed") {
+          return '<span class="action-state completed" aria-label="Completed">✅</span>';
+        }
+        if (action.status === "failed") {
+          return '<span class="action-state failed" aria-label="Needs attention">!</span>';
+        }
+        if (action.status === "followup") {
+          return '<span class="action-state" aria-label="Continued with a follow-up">↻</span>';
+        }
+        return '<span class="action-state" aria-label="In progress"><span class="action-spinner" aria-hidden="true"></span></span>';
+      }
+
+      function entryIcon(entry) {
+        if (entry.visual === "agent") return icons.agent;
+        if (entry.type === "group" && entry.groupKind === "context") return icons.context;
+        if (entry.type === "thinking") return icons.thought;
+        if (entry.type === "observation") return icons.observation;
+        return icons.work;
+      }
+
+      function entryCopy(entry) {
+        const prefixes = {
+          thinking: "Thinking",
+          observation: "Observing",
+        };
+        const prefix = prefixes[entry.type];
+        if (!prefix) {
+          const count = entry.type === "group" && entry.actionCount
+            ? `<span class="rollup-count">${entry.actionCount} ${entry.actionCount === 1 ? "action" : "actions"}</span>`
+            : "";
+          return `${escapeHtml(entry.summary)}${count ? ` ${count}` : ""}`;
+        }
+        return `<span class="timeline-kind">${prefix}</span><span class="timeline-separator"> — </span>${escapeHtml(entry.summary)}`;
+      }
+
+      function renderTimelineRow(entry, expandable) {
+        const markerClass = entry.visual === "agent"
+          ? "agent"
+          : entry.type === "group" && entry.groupKind === "context"
+            ? "context"
+            : entry.type;
+        return `
+          <${expandable ? "summary" : "div"} class="timeline-row">
+            <span class="timeline-marker ${escapeHtml(markerClass)}">${entryIcon(entry)}</span>
+            <span class="timeline-copy">${entryCopy(entry)}</span>
+            ${actionState(entry)}
+            <time class="timeline-time" datetime="${escapeHtml(entry.startedAt || "")}">${escapeHtml(formatTime(entry.startedAt))}</time>
+            ${expandable ? `<span class="timeline-chevron">${icons.chevron}</span>` : '<span class="timeline-chevron" aria-hidden="true"></span>'}
+          </${expandable ? "summary" : "div"}>`;
+      }
+
+      function renderTimelineEntry(turnKey, entry) {
+        if (entry.type === "group") {
+          const key = `${turnKey}-${entry.id}`;
+          return `
+            <details class="timeline-entry context-rollup" data-open-key="${escapeHtml(key)}"${openAttribute(key, false)}>
+              ${renderTimelineRow(entry, true)}
+              <div class="rollup-children">
+                ${(entry.children || []).map((child) => renderTimelineEntry(`${key}-child`, child)).join("")}
+              </div>
+            </details>`;
+        }
+        const detail = entry.detail || "";
+        const entryClass = entry.visual === "agent" ? " agent-launch" : "";
+        if (!detail) {
+          return `<div class="timeline-entry${entryClass}">${renderTimelineRow(entry, false)}</div>`;
+        }
+        const key = `${turnKey}-${entry.id}`;
+        return `
+          <details class="timeline-entry${entryClass}" data-open-key="${escapeHtml(key)}"${openAttribute(key, false)}>
+            ${renderTimelineRow(entry, true)}
+            <div class="timeline-detail">
+              <p class="timeline-detail-label">${escapeHtml(entry.detailLabel || "Details")}</p>
+              <p class="timeline-detail-text">${escapeHtml(detail)}</p>
+            </div>
+          </details>`;
+      }
+
+      function renderSleep(sleep, isLatest) {
+        const status = sleep.status || "pending";
+        const title = status === "failed" ? "Couldn’t schedule the next check-in" : "Sleeping for:";
+        const duration = formatDuration(sleep.durationSeconds);
+        return `
+          <div class="timeline-entry timeline-sleep">
+            <span class="timeline-marker sleep">${icons.moon}</span>
+            <div class="sleep-card" data-sleep-until="${escapeHtml(sleep.until || "")}" data-sleep-duration="${escapeHtml(sleep.durationSeconds || 0)}" data-sleep-status="${escapeHtml(status)}" data-latest="${isLatest ? "true" : "false"}">
+              <div class="sleep-main">
+                <div>
+                  <p class="sleep-title" data-sleep-title>${escapeHtml(title)}</p>
+                  <p class="sleep-reason">${escapeHtml(sleep.reason || "Waiting before the next turn.")}</p>
+                </div>
+                <span class="sleep-countdown" data-sleep-countdown>${escapeHtml(duration)}</span>
+              </div>
+              <div class="sleep-progress" aria-hidden="true"><div class="sleep-progress-bar"></div></div>
+            </div>
+          </div>`;
+      }
+
+      function renderTimeline(turn, turnKey, isLatest) {
+        return `
+          <div class="event-stream">
+            ${(turn.timeline || []).map((entry) => entry.type === "sleep"
+              ? renderSleep(entry, isLatest)
+              : renderTimelineEntry(turnKey, entry)).join("")}
+          </div>`;
+      }
+
+      function renderStartingPrompt(prompt) {
+        if (!prompt) return "";
+        return `
+          <article class="starting-prompt">
+            <div class="prompt-bubble">
+              <p class="prompt-label">Starting prompt</p>
+              <p class="prompt-text">${escapeHtml(prompt)}</p>
+            </div>
+            <span class="user-avatar" aria-hidden="true">YOU</span>
+          </article>`;
+      }
+
+      function renderQueuedMessages(messages, key, defaultOpen = false) {
+        if (!messages?.length) return "";
+        const pending = defaultOpen;
+        const label = pending ? "Queued message" : "Message";
+        return `
+          <section class="user-message-stack${pending ? " pending" : ""}" data-message-key="${escapeHtml(key)}">
+            ${messages.map((message) => `
+              <article class="starting-prompt user-message">
+                <div class="prompt-bubble">
+                  <div class="prompt-label-row">
+                    <p class="prompt-label">${escapeHtml(label)}</p>
+                    <time class="message-time" datetime="${escapeHtml(message.queuedAt || "")}">${escapeHtml(formatTime(message.queuedAt))}</time>
+                  </div>
+                  <p class="prompt-text">${escapeHtml(message.text)}</p>
+                </div>
+                <span class="user-avatar" aria-hidden="true">YOU</span>
+              </article>`).join("")}
+          </section>`;
+      }
+
+      function turnStatus(turn, isLatest, run) {
+        const sleepUntil = dateValue(turn.sleep?.until);
+        if (isLatest && sleepUntil && sleepUntil.getTime() > Date.now()) return "Sleeping";
+        if (isLatest && !turn.endedAt && run.isLive) return "Live";
+        if (turn.failedActionCount) return `${turn.failedActionCount} need attention`;
+        if (turn.pendingActionCount) return `${turn.pendingActionCount} in progress`;
+        return "Turn complete";
+      }
+
+      function renderTurn(turn, index, turns, run) {
+        const isLatest = index === turns.length - 1;
+        const turnKey = `${run.instanceId}-${turn.id}`;
+        const status = turnStatus(turn, isLatest, run);
+        const isLive = status === "Live" || status === "Sleeping";
+        const eventCount = (turn.timeline || []).length;
+        const title = turn.endedAt ? (turn.summary || "Turn complete") : turn.intro;
+        return `
+          <details class="turn-thread" data-open-key="${escapeHtml(turnKey)}"${openAttribute(turnKey, isLatest)}>
+            <summary class="turn-summary">
+              <div class="turn-title-block">
+                <div class="turn-eyebrow">
+                  <span>Turn ${turn.number}</span>
+                  ${isLive ? `<span class="turn-live">● ${escapeHtml(status)}</span>` : `<span>· ${escapeHtml(status)}</span>`}
+                </div>
+                <h2 class="turn-title">${escapeHtml(title)}</h2>
+              </div>
+              <div class="turn-meta">
+                <span>${escapeHtml(formatTime(turn.startedAt))}</span>
+                <span>${eventCount} ${eventCount === 1 ? "update" : "updates"}</span>
+                <span class="turn-chevron">${icons.chevron}</span>
+              </div>
+            </summary>
+            <div class="turn-content">
+              <div class="wake-line">${icons.wake}<span>${escapeHtml(turn.intro)}</span></div>
+              ${renderTimeline(turn, turnKey, isLatest)}
+            </div>
+          </details>`;
+      }
+
+      function renderFeed(data) {
+        const run = data.run;
+        const turns = data.turns || [];
+        elements.engineTitle.textContent = run.displayName;
+        updateHeaderStatus();
+        elements.syncLine.textContent = `${data.stats.turns} turns · ${data.stats.actions} actions · updated ${relativeTime(run.updatedAt)}`;
+
+        if (!turns.length) {
+          elements.feedInner.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-card">
+                <h2>No activity yet</h2>
+                <p>This run exists, but its first engine event has not arrived.</p>
+              </div>
+            </div>`;
+          return;
+        }
+
+        elements.feedInner.innerHTML = `
+          <div class="date-divider">${escapeHtml(formatDate(run.startedAt))}</div>
+          ${renderStartingPrompt(data.startingPrompt)}
+          <div class="stream-intro">
+            <div class="small-avatar" aria-hidden="true">${escapeHtml(run.displayName.split(" ").map((part) => part[0]).join("").slice(0, 2))}</div>
+            <div class="intro-copy">
+              <strong>${escapeHtml(run.displayName)} started a run</strong>
+              <span>${escapeHtml(formatTime(run.startedAt))} · Run ${escapeHtml(run.shortId)}</span>
+            </div>
+          </div>
+          ${turns.map((turn, index) => `
+            ${renderQueuedMessages(turn.queuedMessagesBefore, `${run.instanceId}-${turn.id}-queued-before`, false)}
+            ${renderTurn(turn, index, turns, run)}
+          `).join("")}
+          ${renderQueuedMessages(data.queuedMessages, `${run.instanceId}-queued-next`, true)}`;
+
+        bindDetailState();
+        updateSleepCountdowns();
+      }
+
+      function bindDetailState() {
+        elements.feedInner.querySelectorAll("details[data-open-key]").forEach((detail) => {
+          detail.addEventListener("toggle", () => {
+            const key = detail.dataset.openKey;
+            state.touchedKeys.add(key);
+            if (detail.open) state.openKeys.add(key);
+            else state.openKeys.delete(key);
+          });
+        });
+      }
+
+      function updateSleepCountdowns() {
+        elements.feedInner.querySelectorAll(".sleep-card").forEach((card) => {
+          const countdown = card.querySelector("[data-sleep-countdown]");
+          const title = card.querySelector("[data-sleep-title]");
+          const progress = card.querySelector(".sleep-progress-bar");
+          const status = card.dataset.sleepStatus;
+          const duration = Math.max(0, Number(card.dataset.sleepDuration) || 0);
+          const until = dateValue(card.dataset.sleepUntil);
+          if (status === "failed") {
+            countdown.textContent = "—";
+            progress.style.setProperty("--sleep-progress", "0%");
+            return;
+          }
+          if (!until) {
+            title.textContent = "Preparing to sleep";
+            countdown.textContent = formatDuration(duration);
+            progress.style.setProperty("--sleep-progress", "0%");
+            return;
+          }
+          const remaining = Math.max(0, Math.ceil((until.getTime() - Date.now()) / 1000));
+          const elapsed = duration ? Math.max(0, duration - remaining) : 0;
+          const percent = duration ? Math.min(100, Math.max(0, elapsed / duration * 100)) : 100;
+          if (remaining > 0) {
+            title.textContent = "Sleeping for:";
+            countdown.textContent = formatDuration(remaining);
+          } else {
+            title.textContent = card.dataset.latest === "true" ? "Ready for the next turn" : "Slept for:";
+            countdown.textContent = formatDuration(duration);
+          }
+          progress.style.setProperty("--sleep-progress", `${percent}%`);
+        });
+      }
+
+      function renderRunOptions() {
+        const current = state.selectedKey;
+        elements.picker.innerHTML = state.runs.map((run) => {
+          const key = keyFor(run);
+          const runStatus = key === current && state.runData ? effectiveRunStatus(state.runData) : run.stateLabel;
+          const label = `${run.displayName} · ${runStatus} · ${formatTime(run.updatedAt)} · ${run.shortId}`;
+          return `<option value="${escapeHtml(key)}"${key === current ? " selected" : ""}>${escapeHtml(label)}</option>`;
+        }).join("");
+        elements.liveButton.hidden = !state.recommendedKey || state.selectedKey === state.recommendedKey;
+      }
+
+      function renderActiveAgents(payload) {
+        const agents = payload.agents || [];
+        state.agents = agents;
+        elements.agentCount.textContent = String(agents.length);
+        elements.agentCount.setAttribute("aria-label", `${agents.length} active ${agents.length === 1 ? "agent" : "agents"}`);
+        elements.agentRailSync.textContent = agents.length
+          ? `Live session state · updated ${relativeTime(payload.updatedAt)}`
+          : "Live session state";
+
+        if (!agents.length) {
+          elements.agentList.innerHTML = '<div class="agent-empty">No delegated agents are active.</div>';
+          return;
+        }
+
+        elements.agentList.innerHTML = agents.map((agent) => {
+          const status = statusClass(agent.statusLabel);
+          const detail = agent.taskTitle || agent.conversationName || "Delegated project work";
+          return `
+            <article class="agent-card" aria-label="${escapeHtml(`${agent.displayName}, ${agent.workingOn}, ${agent.statusLabel}`)}">
+              <div class="agent-card-top">
+                <span class="agent-card-avatar" aria-hidden="true">🤖</span>
+                <div class="agent-card-heading">
+                  <h3 class="agent-card-name">${escapeHtml(agent.displayName)} <span class="agent-assignment">(${escapeHtml(agent.workingOn)})</span></h3>
+                </div>
+              </div>
+              <p class="agent-card-task" title="${escapeHtml(detail)}">${escapeHtml(detail)}</p>
+              <div class="agent-card-meta">
+                <span class="status-dot ${escapeHtml(status)}" aria-hidden="true"></span>
+                <span>${escapeHtml(agent.statusLabel)}</span>
+                <span aria-hidden="true">·</span>
+                <span class="agent-elapsed" data-started-at="${escapeHtml(agent.startedAt || "")}">${escapeHtml(formatElapsed(agent.startedAt))}</span>
+              </div>
+            </article>`;
+        }).join("");
+      }
+
+      async function fetchJson(url) {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      }
+
+      async function refreshRuns() {
+        try {
+          const payload = await fetchJson("/api/runs");
+          state.runs = payload.runs || [];
+          state.recommendedKey = payload.recommended ? keyFor(payload.recommended) : null;
+          if (!state.runs.length) {
+            state.selectedKey = null;
+            renderRunOptions();
+            showEmpty("No engine runs found", "Start an engine run and its activity will appear here automatically.");
+            return;
+          }
+          const selectedStillExists = state.runs.some((run) => keyFor(run) === state.selectedKey);
+          if (!selectedStillExists || (!state.userSelected && state.recommendedKey && state.selectedKey !== state.recommendedKey)) {
+            state.selectedKey = state.recommendedKey || keyFor(state.runs[0]);
+            state.version = null;
+          }
+          renderRunOptions();
+          await refreshSelectedRun();
+        } catch (error) {
+          showError("Couldn’t read engine activity", "The local Engine Chat service may have stopped. It will retry automatically.");
+        }
+      }
+
+      async function refreshActiveAgents() {
+        if (state.loadingAgents) return;
+        state.loadingAgents = true;
+        try {
+          const payload = await fetchJson("/api/agents");
+          const signature = JSON.stringify((payload.agents || []).map((agent) => [
+            agent.runId,
+            agent.status,
+            agent.workingOn,
+            agent.taskTitle,
+            agent.lastActivityAt,
+          ]));
+          if (signature !== state.agentSignature) {
+            state.agentSignature = signature;
+            renderActiveAgents(payload);
+          } else {
+            elements.agentRailSync.textContent = state.agents.length
+              ? `Live session state · checked ${relativeTime(payload.updatedAt)}`
+              : "Live session state";
+          }
+        } catch (error) {
+          if (!state.agents.length) {
+            elements.agentCount.textContent = "!";
+            elements.agentList.innerHTML = '<div class="agent-empty">Agent activity is temporarily unavailable.</div>';
+            elements.agentRailSync.textContent = "Reconnecting…";
+          }
+        } finally {
+          state.loadingAgents = false;
+        }
+      }
+
+      async function refreshSelectedRun() {
+        if (!state.selectedKey || state.loading) return;
+        state.loading = true;
+        const [definitionId, instanceId] = state.selectedKey.split("/");
+        try {
+          const data = await fetchJson(`/api/runs/${encodeURIComponent(definitionId)}/${encodeURIComponent(instanceId)}`);
+          state.lastSyncAt = new Date();
+          if (data.run.version !== state.version) {
+            const shouldFollow = state.following && isNearBottom();
+            state.runData = data;
+            state.version = data.run.version;
+            renderFeed(data);
+            renderRunOptions();
+            elements.feed.setAttribute("aria-busy", "false");
+            if (shouldFollow || state.following) {
+              requestAnimationFrame(() => scrollToLatest(state.version ? "smooth" : "auto"));
+            }
+          }
+        } catch (error) {
+          showError("This run is temporarily unavailable", "The log may be changing. Engine Chat will try again.");
+        } finally {
+          state.loading = false;
+        }
+      }
+
+      function showEmpty(title, message) {
+        elements.feed.setAttribute("aria-busy", "false");
+        elements.feedInner.innerHTML = `
+          <div class="empty-state"><div class="empty-card"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div></div>`;
+      }
+
+      function showError(title, message) {
+        if (state.runData) return;
+        elements.feed.setAttribute("aria-busy", "false");
+        elements.statusLabel.textContent = "Reconnecting";
+        elements.statusDot.className = "status-dot paused";
+        elements.feedInner.innerHTML = `
+          <div class="error-state"><div class="empty-card"><h2>${escapeHtml(title)}</h2><p>${escapeHtml(message)}</p></div></div>`;
+      }
+
+      elements.picker.addEventListener("change", async (event) => {
+        state.selectedKey = event.target.value;
+        state.userSelected = true;
+        state.version = null;
+        state.runData = null;
+        state.following = true;
+        elements.feed.setAttribute("aria-busy", "true");
+        renderRunOptions();
+        await refreshSelectedRun();
+      });
+
+      elements.liveButton.addEventListener("click", async () => {
+        if (!state.recommendedKey) return;
+        state.selectedKey = state.recommendedKey;
+        state.userSelected = false;
+        state.version = null;
+        state.following = true;
+        renderRunOptions();
+        await refreshSelectedRun();
+      });
+
+      elements.jumpButton.addEventListener("click", () => scrollToLatest());
+
+      elements.feed.addEventListener("scroll", () => {
+        const nearBottom = isNearBottom();
+        if (nearBottom) state.following = true;
+        else if (state.runData) state.following = false;
+        elements.jumpButton.hidden = nearBottom;
+      }, { passive: true });
+
+      setInterval(() => {
+        updateSleepCountdowns();
+        document.querySelectorAll(".agent-elapsed[data-started-at]").forEach((element) => {
+          element.textContent = formatElapsed(element.dataset.startedAt);
+        });
+        if (state.runData) {
+          updateHeaderStatus();
+          elements.syncLine.textContent = `${state.runData.stats.turns} turns · ${state.runData.stats.actions} actions · updated ${relativeTime(state.runData.run.updatedAt)}`;
+        }
+      }, 1000);
+
+      setInterval(refreshSelectedRun, POLL_INTERVAL_MS);
+      setInterval(refreshRuns, RUN_LIST_INTERVAL_MS);
+      setInterval(refreshActiveAgents, AGENT_POLL_INTERVAL_MS);
+      refreshRuns();
+      refreshActiveAgents();
+    })();
+  </script>
+</body>
+</html>
