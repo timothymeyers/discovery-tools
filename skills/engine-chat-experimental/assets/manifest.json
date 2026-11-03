@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "serviceId": "engine-chat",
+  "packageVersion": "0.1.0-experimental",
+  "protocolVersion": "1",
+  "testedCompatibility": {
+    "discoveryVersion": "0.15.19",
+    "operatingSystem": "macOS",
+    "statement": "Tested with Discovery 0.15.19 on macOS; other versions and platforms are untested."
+  },
+  "payloadHashes": {
+    "index.html": "5552a17dd53c10ef12a3f0362f7f64a42e07f394de974a973309076e89d57735",
+    "server.py": "451c69612ac2d01839bfda497504ea7ef6ba4a8a4693270f35b0d55866c8de3f"
+  }
+}
