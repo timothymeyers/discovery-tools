@@ -15,11 +15,12 @@ metadata:
   version: "0.1.0-experimental"
   category: "Cross-domain"
   subfield: "Research platform observability"
+  tested-with: "Discovery App Preview 0.15.21 (macOS)"
 ---
 
 # Chat Session Experimental
 
-Tested with **Discovery App Preview 0.15.x on macOS**. The script also checks
+Tested with **Discovery App Preview 0.15.21 on macOS**. The script also checks
 VS Code, VS Code Insiders, and the Linux and Windows config folders, but those
 have not been tested. Don't claim they work.
 
