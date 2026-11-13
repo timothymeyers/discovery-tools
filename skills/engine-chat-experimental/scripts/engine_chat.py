@@ -23,9 +23,9 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 SERVICE_ID = "engine-chat"
-PACKAGE_VERSION = "0.1.0-experimental"
+PACKAGE_VERSION = "0.2.0-experimental"
 PROTOCOL_VERSION = "1"
-TESTED_DISCOVERY_VERSION = "0.15.19"
+TESTED_DISCOVERY_VERSION = "0.15.21"
 TESTED_OS = "macOS"
 PREFERRED_PORT = 8765
 LAST_PORT = 8785
@@ -927,7 +927,7 @@ def error_payload(error: ManagerError) -> Dict[str, Any]:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Manage Engine Chat 0.1.0-experimental. Tested with Discovery 0.15.19 on macOS; "
+            "Manage Engine Chat 0.2.0-experimental. Tested with Discovery 0.15.21 on macOS; "
             "other versions and platforms are untested."
         )
     )

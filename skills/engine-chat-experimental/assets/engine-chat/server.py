@@ -19,22 +19,48 @@ from urllib.parse import unquote, urlparse
 
 
 SERVICE_ID = "engine-chat"
-ENGINE_CHAT_VERSION = "0.1.0-experimental"
+ENGINE_CHAT_VERSION = "0.2.0-experimental"
 PROTOCOL_VERSION = "1"
-TESTED_DISCOVERY_VERSION = "0.15.19"
+TESTED_DISCOVERY_VERSION = "0.15.21"
 TESTED_OS = "macOS"
 LOOPBACK_HOST = "127.0.0.1"
 TERMINAL_STATES = {"cancelled", "completed", "failed", "stopped"}
 IDLE_LIVE_WINDOW_SECONDS = 30 * 60
 ACTIVE_AGENT_STATES = {"running", "queued", "pending", "starting", "waiting", "permissionneeded"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+AGENT_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+COPILOT_CLIENT_NAME = "discovery-express"
+COPILOT_MATCH_WINDOW_SECONDS = 120
 JSON_FENCE_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^\)]+\)")
 SOURCE_REF_RE = re.compile(r"\s*\[source:\s*[^\]]+\]", re.IGNORECASE)
 TASK_ID_RE = re.compile(r"DX-\d+", re.IGNORECASE)
 TOOL_FAILURE_RE = re.compile(r"Tool call failed:\s*(.*?)\s+-\s+", re.DOTALL)
 FRACTION_RE = re.compile(r"^(?P<head>.*?\.)(?P<fraction>\d+)(?P<zone>Z|[+-]\d{2}:\d{2})?$")
-STEERING_RE = re.compile(r"^Communication queued on steering:[^:]+:\s*(.*)$", re.DOTALL | re.IGNORECASE)
+STEERING_RE = re.compile(
+    r"^Communication (?P<delivery>queued|applied) on steering:[^:]+:\s*(?P<message>.*)$",
+    re.DOTALL | re.IGNORECASE,
+)
+STEERING_INTERRUPT_RE = re.compile(r"^Turn interrupted by steering message\b", re.IGNORECASE)
+USER_REQUEST_RE = re.compile(
+    r"\b(?:waiting\s+(?:for|on)|awaiting|pending|needs?|requires?|ready\s+for)\s+"
+    r"(?:your|human|user)\s+(?:final\s+)?"
+    r"(?P<kind>approval|review|input|decision|confirmation|response|feedback)\b",
+    re.IGNORECASE,
+)
+NON_CURRENT_REQUEST_RE = re.compile(
+    r"\b(?:not|no|never|without|already|previously|earlier|was|were|had|"
+    r"if|when|once|after|example|quoted|says?|said|mentions?|"
+    r"don't|doesn't|isn't|aren't|wasn't|weren't)\b",
+    re.IGNORECASE,
+)
+RESOLVED_REQUEST_RE = re.compile(
+    r"\b(?:approval|review|input|decision|confirmation|response|feedback)\s+"
+    r"(?:(?:has been|is|was)\s+)?(?:received|granted|provided|completed|resolved)\b|"
+    r"\bno\s+(?:further\s+)?(?:action|approval|review|input)\s+(?:is\s+)?(?:needed|required)\b|"
+    r"\bno longer\s+(?:waiting|awaiting|needed|required)\b",
+    re.IGNORECASE,
+)
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self' 'unsafe-inline'; "
@@ -136,11 +162,22 @@ def extract_starting_prompt(value: Any, workspace: Path) -> Optional[str]:
 
 
 def extract_steering_message(value: Any, workspace: Path) -> Optional[str]:
-    match = STEERING_RE.match(str(value or ""))
+    match = STEERING_RE.match(str(value or "").strip())
     if not match:
         return None
-    message = clean_narrative(match.group(1), workspace, limit=12000)
+    message = clean_narrative(match.group("message"), workspace, limit=12000)
     return message or None
+
+
+def is_steering_boundary(event: Dict[str, Any]) -> bool:
+    if event.get("kind") != "Progress":
+        return False
+    content = str(event.get("content") or "").strip()
+    match = STEERING_RE.match(content)
+    return bool(
+        (match and match.group("delivery").lower() == "applied")
+        or STEERING_INTERRUPT_RE.match(content)
+    )
 
 
 def coalesce_streaming_text_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -152,7 +189,7 @@ def coalesce_streaming_text_events(events: List[Dict[str, Any]]) -> List[Dict[st
         kind = str(event.get("kind", ""))
         if kind not in {"Thinking", "Observation"}:
             result.append(event)
-            if kind == "Done":
+            if kind == "Done" or is_steering_boundary(event):
                 active.clear()
             continue
 
@@ -403,7 +440,7 @@ def state_label(state: Any) -> str:
     labels = {
         "running": "Working",
         "sleeping": "Sleeping",
-        "idle": "Waiting",
+        "idle": "Idle",
         "paused": "Paused",
         "completed": "Complete",
         "failed": "Needs attention",
@@ -790,6 +827,10 @@ def action_profile(
         "operation": operation,
         "targetStatus": target_status,
         "agentRole": agent_role,
+        # Structured task references only; task names mentioned in a prompt
+        # or progress note must not widen the live approval scope.
+        "taskRefs": [str(raw_input["taskId"])]
+        if operation in {"launch", "transition", "progress"} and raw_input.get("taskId") else [],
     }
 
 
@@ -797,6 +838,8 @@ def combined_status(entries: List[Dict[str, Any]]) -> str:
     statuses = [str(entry.get("status", "")) for entry in entries]
     if "pending" in statuses:
         return "pending"
+    if "interrupted" in statuses:
+        return "interrupted"
     if "completed" in statuses:
         return "completed"
     if "followup" in statuses:
@@ -1024,7 +1067,29 @@ def thought_block(value: str, workspace: Path) -> Optional[Dict[str, Optional[st
     return {"summary": summary, "detail": detail}
 
 
-def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Optional[str]]]:
+def explicit_user_request(value: str, workspace: Path) -> Optional[Dict[str, str]]:
+    """Recognize direct handoff language, not generic waiting or mentions of approval.
+
+    This is an indication from an observation, not an authoritative approval queue.
+    Quoted examples, code, historical requests, and negated requests are excluded.
+    """
+    text = re.sub(r"```.*?```", "", str(value or ""), flags=re.DOTALL)
+    text = re.sub(r"`[^`\n]*`", "", text)
+    text = re.sub(r"(?m)^\s*>.*$", "", text)
+    text = re.sub(r'"[^"\n]*"|“[^”\n]*”|(?<!\w)\x27[^\x27\n]+\x27(?!\w)', "", text)
+    text = clean_narrative(text, workspace, limit=12000)
+    request = None
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        if RESOLVED_REQUEST_RE.search(sentence):
+            request = None
+            continue
+        match = USER_REQUEST_RE.search(sentence)
+        if match and not NON_CURRENT_REQUEST_RE.search(sentence.replace("’", "'")):
+            request = {"kind": match.group("kind").lower(), "excerpt": clean_inline(sentence, 320)}
+    return request
+
+
+def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Any]]:
     text = clean_narrative(value, workspace)
     if not text:
         return None
@@ -1045,13 +1110,58 @@ def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Optiona
         return {"summary": summary, "detail": None}
     summary = summarize_narrative(text)
     detail = text if summary != text else None
-    return {"summary": summary, "detail": detail}
+    return {"summary": summary, "detail": detail, "userRequest": explicit_user_request(value, workspace)}
 
 
-def turn_intro(number: int, timeline: List[Dict[str, Any]]) -> str:
+def user_action_attention(
+    state: str, turns: List[Dict[str, Any]], pending_messages: List[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """Surface a completed turn's final request without changing engine lifecycle."""
+    if state.lower() not in {"idle", "paused"} or not turns or pending_messages:
+        return None
+    latest = turns[-1]
+    if (
+        not latest.get("endedAt") or latest.get("endReason") == "steering"
+        or latest.get("pendingActionCount") or latest.get("failedActionCount")
+    ):
+        return None
+    sleep = latest.get("sleep") or {}
+    until = parse_time(sleep.get("until"))
+    if sleep.get("status") == "pending" or (
+        sleep.get("status") == "scheduled" and (until is None or until > datetime.now(timezone.utc))
+    ):
+        return None
+    timeline = [entry for entry in latest.get("timeline", []) if entry.get("type") != "sleep"]
+    observation = timeline[-1] if timeline else {}
+    request = observation.get("userRequest")
+    if observation.get("type") != "observation" or not request:
+        return None
+    kind = request["kind"]
+    return {
+        "kind": kind,
+        "label": "Needs your action",
+        "title": "Ready for your review" if kind == "review" else "Waiting for your {}".format(kind),
+        "description": (
+            "This turn is finished. Review the results, then approve or request changes in Discovery."
+            if kind in {"approval", "review"}
+            else "This turn is finished. Read the latest update and provide the requested input in Discovery."
+        ),
+        "excerpt": request["excerpt"],
+        "source": "Latest observation",
+        "turnId": latest["id"],
+        "entryId": observation["id"],
+        "requestedAt": observation.get("startedAt"),
+    }
+
+
+def turn_intro(number: int, timeline: List[Dict[str, Any]], after_steering: bool = False) -> str:
+    first_action = next(iter_actions(timeline), None)
+    if after_steering:
+        if first_action and first_action.get("intent") == "context":
+            return "Gathering context after your steering message."
+        return "Continuing with your steering message."
     if number == 1:
         return "Waking up. Getting the lay of the land."
-    first_action = next(iter_actions(timeline), None)
     first_summary = str(first_action.get("summary", "")).lower() if first_action else ""
     if any(word in first_summary for word in ("validat", "evaluat", "audit", "checking results")):
         return "Back awake. Checking how things landed."
@@ -1064,7 +1174,14 @@ class EngineRunParser:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
 
-    def parse(self, run_dir: Path, meta: Dict[str, Any], signature: Tuple[int, int, int, int]) -> Dict[str, Any]:
+    def parse(
+        self,
+        run_dir: Path,
+        meta: Dict[str, Any],
+        signature: Tuple[int, int, int, int],
+        events: Optional[List[Dict[str, Any]]] = None,
+        coalesce: bool = True,
+    ) -> Dict[str, Any]:
         output_path = run_dir / "output.jsonl"
         turns: List[Dict[str, Any]] = []
         current: Optional[Dict[str, Any]] = None
@@ -1086,6 +1203,11 @@ class EngineRunParser:
                     "number": number,
                     "startedAt": timestamp,
                     "endedAt": None,
+                    "endReason": None,
+                    "startReason": "steering" if (
+                        any(message.get("delivery") == "applied" for message in pending_steering)
+                        or (turns and turns[-1].get("endReason") == "steering")
+                    ) else None,
                     "timeline": [],
                     "sleep": None,
                     "queuedMessagesBefore": pending_steering,
@@ -1127,6 +1249,7 @@ class EngineRunParser:
                             "summary": block["summary"],
                             "detail": block["detail"],
                             "detailLabel": "Observation",
+                            "userRequest": block.get("userRequest"),
                             "startedAt": text_timestamp,
                         }
                     )
@@ -1144,22 +1267,52 @@ class EngineRunParser:
                     return queue.popleft()
             return None
 
-        if output_path.exists():
-            parsed_events: List[Dict[str, Any]] = []
-            with output_path.open("r", encoding="utf-8", errors="replace") as stream:
-                for line in stream:
-                    if not line.strip():
-                        continue
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        malformed_lines += 1
-                        continue
-                    if not isinstance(event, dict):
-                        continue
-                    parsed_events.append(event)
+        def interrupt_turn(timestamp: Optional[str], sequence: Any) -> None:
+            nonlocal current, pending
+            # The applied message and the restart notice describe one boundary.
+            # Neither should create an empty turn while awaiting the next event.
+            if current is None:
+                return
+            for action in iter_actions(current["timeline"]):
+                if action.get("status") == "pending":
+                    action["status"] = "interrupted"
+                    action["finishedAt"] = timestamp
+            sleep = current.get("sleep")
+            if sleep is not None:
+                if sleep.get("status") in {"pending", "scheduled"}:
+                    sleep["status"] = "interrupted"
+                if sleep not in current["timeline"]:
+                    current["timeline"].append(sleep)
+            current["timeline"].append(
+                {
+                    "id": "steering-received-{}".format(sequence),
+                    "type": "steering",
+                    "summary": "Received steering message",
+                    "startedAt": timestamp,
+                }
+            )
+            current["endedAt"] = timestamp
+            current["endReason"] = "steering"
+            current = None
+            pending = defaultdict(deque)
 
-            for event in coalesce_streaming_text_events(parsed_events):
+        if events is not None or output_path.exists():
+            parsed_events: List[Dict[str, Any]] = list(events or [])
+            if events is None:
+                with output_path.open("r", encoding="utf-8", errors="replace") as stream:
+                    for line in stream:
+                        if not line.strip():
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            malformed_lines += 1
+                            continue
+                        if not isinstance(event, dict):
+                            continue
+                        parsed_events.append(event)
+
+            for event in (coalesce_streaming_text_events(parsed_events) if coalesce else parsed_events):
                 kind = str(event.get("kind", ""))
                 timestamp = event.get("timestamp")
                 if isinstance(timestamp, str):
@@ -1179,15 +1332,37 @@ class EngineRunParser:
                 flush_text()
 
                 if kind == "Progress":
-                    steering_text = extract_steering_message(event.get("content", ""), self.workspace)
-                    if steering_text:
-                        pending_steering.append(
-                            {
-                                "id": "steering-{}".format(event.get("sequence", len(pending_steering) + 1)),
-                                "text": steering_text,
-                                "queuedAt": timestamp,
-                            }
-                        )
+                    content = str(event.get("content") or "").strip()
+                    steering = STEERING_RE.match(content)
+                    if steering:
+                        delivery = steering.group("delivery").lower()
+                        steering_text = extract_steering_message(content, self.workspace)
+                        if steering_text:
+                            # A queued message may later be applied. Update its
+                            # bubble instead of showing the same message twice.
+                            queued = next(
+                                (message for message in pending_steering
+                                 if message.get("delivery") == "queued" and message["text"] == steering_text),
+                                None,
+                            ) if delivery == "applied" else None
+                            if queued is not None:
+                                queued["delivery"] = "applied"
+                                queued["receivedAt"] = timestamp
+                            else:
+                                pending_steering.append(
+                                    {
+                                        "id": "steering-{}".format(event.get("sequence", len(pending_steering) + 1)),
+                                        "text": steering_text,
+                                        "queuedAt": timestamp,
+                                        "receivedAt": timestamp if delivery == "applied" else None,
+                                        "delivery": delivery,
+                                    }
+                                )
+                        if delivery == "applied":
+                            interrupt_turn(timestamp, event.get("sequence"))
+                        continue
+                    if STEERING_INTERRUPT_RE.match(content):
+                        interrupt_turn(timestamp, event.get("sequence"))
                         continue
 
                 if kind == "Done":
@@ -1198,6 +1373,11 @@ class EngineRunParser:
                             current["timeline"].append(sleep)
                     current = None
                     pending = defaultdict(deque)
+                    continue
+
+                # Late tool acknowledgements from a cancelled turn must not
+                # consume the steering bubble or manufacture a new empty turn.
+                if kind == "ActionApplied" and current is None:
                     continue
 
                 turn = ensure_turn(timestamp)
@@ -1365,8 +1545,10 @@ class EngineRunParser:
             label_read_revisits(turn["timeline"])
             turn["timeline"] = roll_up_context(turn["timeline"])
             actions = list(iter_actions(turn["timeline"]))
-            turn["intro"] = turn_intro(turn["number"], turn["timeline"])
+            turn["intro"] = turn_intro(turn["number"], turn["timeline"], turn["startReason"] == "steering")
             turn["summary"] = concise_turn_summary(turn["timeline"])
+            if turn["endReason"] == "steering" and turn["summary"] == "Turn complete":
+                turn["summary"] = "Received steering message"
             turn["actionCount"] = sum(int(action.get("mergedCount", 1)) for action in actions)
             turn["completedActionCount"] = sum(
                 int(action.get("mergedCount", 1))
@@ -1380,6 +1562,7 @@ class EngineRunParser:
         state = str(meta.get("state", "Unknown"))
         all_actions = [action for turn in turns for action in iter_actions(turn["timeline"])]
         all_action_count = sum(int(action.get("mergedCount", 1)) for action in all_actions)
+        all_steering = [message for turn in turns for message in turn["queuedMessagesBefore"]] + pending_steering
         updated_at = last_timestamp or meta.get("completedAt") or meta.get("startedAt")
         run = {
             "definitionId": str(meta.get("definitionId") or run_dir.parent.name),
@@ -1407,8 +1590,8 @@ class EngineRunParser:
                     if action["status"] == "completed"
                 ),
                 "failedActions": sum(1 for action in all_actions if action["status"] == "failed"),
-                "queuedMessages": sum(len(turn.get("queuedMessagesBefore", [])) for turn in turns)
-                + len(pending_steering),
+                "queuedMessages": sum(1 for message in all_steering if message["delivery"] == "queued"),
+                "steeringMessages": len(all_steering),
                 "malformedLinesIgnored": malformed_lines,
             },
             "turns": turns,
@@ -1419,6 +1602,90 @@ def valid_run_id(value: str) -> bool:
     return bool(value not in {".", ".."} and RUN_ID_RE.fullmatch(value))
 
 
+def tool_event(kind: str, name: str, document: Dict[str, Any], timestamp: Any, sequence: int) -> Dict[str, Any]:
+    content = "**{}**\n```json\n{}\n```".format(name, json.dumps(document, ensure_ascii=False, default=str))
+    return {"kind": kind, "content": content, "timestamp": timestamp, "sequence": sequence}
+
+
+def copilot_tool_title(data: Dict[str, Any], arguments: Dict[str, Any]) -> str:
+    """Pick the title that summarize_action turns into the friendliest label."""
+    name = str(data.get("toolName") or "")
+    if name == "skill" and arguments.get("skill"):
+        return "Using skill: {}".format(arguments["skill"])
+    if name.startswith("discovery-") or arguments.get("path") or arguments.get("filePath"):
+        return name
+    if arguments.get("description"):
+        return clean_inline(arguments["description"], 160)
+    return str(data.get("toolTitle") or name or "tool")
+
+
+def copilot_events_to_engine(lines: Iterable[str]) -> Tuple[List[Dict[str, Any]], Optional[str], int]:
+    """Translate a Copilot session events.jsonl into Engine Chat parser events."""
+    events: List[Dict[str, Any]] = []
+    tool_names: Dict[str, str] = {}
+    prompt: Optional[str] = None
+    malformed = 0
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            malformed += 1
+            continue
+        if not isinstance(record, dict):
+            continue
+        kind = record.get("type")
+        data = record.get("data") if isinstance(record.get("data"), dict) else {}
+        timestamp = record.get("timestamp")
+        sequence = len(events) + 1
+        if kind == "user.message" and prompt is None:
+            prompt = str(data.get("content") or "")
+        elif kind == "assistant.message":
+            reasoning = str(data.get("reasoningText") or "")
+            if reasoning.strip():
+                events.append({"kind": "Thinking", "content": reasoning, "timestamp": timestamp, "sequence": sequence})
+            message = str(data.get("content") or "")
+            if message.strip():
+                events.append({"kind": "Observation", "content": message, "timestamp": timestamp, "sequence": len(events) + 1})
+        elif kind == "tool.execution_start":
+            call_id = str(data.get("toolCallId") or "")
+            arguments = data.get("arguments")
+            name = copilot_tool_title(data, arguments if isinstance(arguments, dict) else {})
+            tool_names[call_id] = name
+            events.append(tool_event("ActionProposed", name, {"rawInput": arguments if isinstance(arguments, dict) else {}}, timestamp, sequence))
+        elif kind == "tool.execution_complete":
+            name = tool_names.pop(str(data.get("toolCallId") or ""), None)
+            if name is None:
+                continue
+            status = "failed" if data.get("success") is False else "completed"
+            events.append(tool_event("ActionApplied", name, {"status": status}, timestamp, sequence))
+    return events, prompt, malformed
+
+
+def acp_events_to_engine(records: Iterable[Any]) -> List[Dict[str, Any]]:
+    """Translate the completion-time ACP projection in .discovery/sessions."""
+    events: List[Dict[str, Any]] = []
+    text_kinds = {"agent_thought_chunk": "Thinking", "agent_message_chunk": "Observation"}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        acp_kind = record.get("acpKind")
+        text = str(record.get("text") or "")
+        timestamp = record.get("recordedAt")
+        kind = text_kinds.get(str(acp_kind))
+        if kind:
+            if events and events[-1]["kind"] == kind:
+                events[-1]["content"] += text
+            else:
+                events.append({"kind": kind, "content": text, "timestamp": timestamp, "sequence": len(events) + 1})
+        elif acp_kind == "tool_call_update" and text.startswith("Proposed:"):
+            name = text.split(":", 1)[1].strip() or "tool"
+            events.append(tool_event("ActionProposed", name, {"rawInput": {}}, timestamp, len(events) + 1))
+            events.append(tool_event("ActionApplied", name, {"status": "completed"}, timestamp, len(events) + 1))
+    return events
+
+
 class EngineRunRepository:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
@@ -1426,8 +1693,13 @@ class EngineRunRepository:
         self.sessions_root = self.workspace / ".discovery" / "sessions"
         self.agent_runs_root = self.workspace / ".discovery" / "agent-runs"
         self.tasks_index_path = self.workspace / ".discovery" / "tasks" / "index.json"
+        self.copilot_state_root = Path(
+            os.environ.get("ENGINE_CHAT_COPILOT_STATE") or Path.home() / ".copilot" / "session-state"
+        )
         self.parser = EngineRunParser(self.workspace)
         self._cache: Dict[Tuple[str, str], Tuple[Tuple[int, int, int, int], Dict[str, Any]]] = {}
+        self._agent_cache: Dict[str, Tuple[Tuple[int, int, int, int], Dict[str, Any]]] = {}
+        self._copilot_sessions: Dict[str, Path] = {}
         self._lock = threading.RLock()
 
     def _safe_run_dir(self, definition_id: str, instance_id: str) -> Optional[Path]:
@@ -1473,7 +1745,7 @@ class EngineRunRepository:
             with path.open("r", encoding="utf-8") as stream:
                 value = json.load(stream)
             return value if isinstance(value, dict) else None
-        except (OSError, json.JSONDecodeError):
+        except (OSError, UnicodeError, json.JSONDecodeError):
             return None
 
     def _task_lookup(self) -> Dict[str, Dict[str, Any]]:
@@ -1489,6 +1761,83 @@ class EngineRunRepository:
                 if key:
                     lookup[str(key)] = task
         return lookup
+
+    def _current_attention(self, parsed: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        attention = user_action_attention(parsed["run"]["state"], parsed["turns"], parsed["queuedMessages"])
+        if not attention or attention["kind"] not in {"approval", "review"}:
+            return attention
+
+        # The final request may name a subtree. Otherwise use tasks the run
+        # actually changed or delegated, never every ready task in the project.
+        references = collect_task_ids(attention["excerpt"]) or list({
+            reference
+            for turn in parsed["turns"] for action in iter_actions(turn["timeline"])
+            if action.get("status") == "completed"
+            for reference in action.get("taskRefs", [])
+        })
+        if not references:
+            # A general request (e.g. review a design) has no task-board truth.
+            # Keep its provenance explicit rather than inventing a task count.
+            return attention
+
+        lookup = {key.lower(): task for key, task in self._task_lookup().items()}
+        tasks = {str(task["taskId"]): task for task in lookup.values() if task.get("taskId")}
+        children: Dict[str, List[str]] = defaultdict(list)
+        for task_id, task in tasks.items():
+            parent = lookup.get(str(task.get("parentId", "")).lower(), {})
+            if parent.get("taskId"):
+                children[str(parent["taskId"])].append(task_id)
+        pending = [str(lookup[ref.lower()]["taskId"]) for ref in references
+                   if lookup.get(ref.lower(), {}).get("taskId")]
+        scoped: set[str] = set()
+        while pending:
+            task_id = pending.pop()
+            if task_id in scoped:
+                continue
+            scoped.add(task_id)
+            pending.extend(children.get(task_id, []))
+        ready = sorted(
+            (tasks[task_id] for task_id in scoped
+             if str(tasks[task_id].get("status", "")).lower() in {"executiondone", "flaggedhuman"}),
+            key=lambda task: str(task.get("dxId") or task["taskId"]),
+        )
+        # Missing/unreadable task data is unknown, not evidence that an old
+        # approval request is still open. Resolved requests disappear here too.
+        if not ready:
+            return None
+        current_tasks = [
+            {
+                "id": str(task.get("dxId") or task["taskId"]),
+                "title": clean_inline(task.get("title"), 140),
+                "status": str(task["status"]),
+            }
+            for task in ready
+        ]
+        count = len(current_tasks)
+        excerpt = "\n".join("{} — {}".format(task["id"], task["title"]) for task in current_tasks[:3])
+        if count > 3:
+            excerpt += "\n+ {} more".format(count - 3)
+        return {
+            **attention,
+            "title": "1 task needs your review" if count == 1 else "{} tasks need your review".format(count),
+            "description": "This turn is finished. Review the current tasks in Discovery, then approve or request changes.",
+            "excerpt": excerpt,
+            "source": "Current task board",
+            "tasks": current_tasks,
+        }
+
+    def _present_run(self, parsed: Dict[str, Any], signature: Tuple[int, int, int, int]) -> Dict[str, Any]:
+        """Refresh handoffs even when only task state or a sleep deadline changed."""
+        run = parsed["run"]
+        attention = self._current_attention(parsed)
+        live = is_live_state(run.get("state"), run.get("updatedAt"))
+        revision = hashlib.sha256(json.dumps([attention, live], sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        # Return a snapshot; concurrent responses must not mutate cached data.
+        return {
+            **parsed,
+            "run": {**run, "attention": attention, "isLive": live,
+                    "version": "{}-{}".format("-".join(map(str, signature)), revision)},
+        }
 
     def list_active_agents(self) -> Dict[str, Any]:
         agents: List[Dict[str, Any]] = []
@@ -1507,30 +1856,7 @@ class EngineRunRepository:
 
             session_id = str(header.get("sessionId") or header.get("legacyRunId") or session_path.stem)
             run = self._read_json(self.agent_runs_root / "{}.json".format(session_id)) or {}
-            agent_id = str(header.get("agentId") or run.get("agentId") or "")
-            task_reference = header.get("taskId") or run.get("taskId")
-            task = tasks.get(str(task_reference), {}) if task_reference else {}
-            task_id = task.get("dxId") or task_reference
-            conversation_name = run.get("conversationName") or ""
-            task_title = task.get("title") or ""
-            started_at = header.get("startedAt") or run.get("startedAt")
-            last_activity_at = header.get("lastActivityAt") or started_at
-            agents.append(
-                {
-                    "runId": session_id,
-                    "shortId": session_id[:8],
-                    "agentId": agent_id,
-                    "displayName": agent_display_name(agent_id),
-                    "taskId": task_id,
-                    "taskTitle": clean_inline(task_title, 140),
-                    "conversationName": clean_inline(conversation_name, 160),
-                    "workingOn": agent_work_label(agent_id, task_id, task_title, conversation_name),
-                    "status": str(status or "Active"),
-                    "statusLabel": agent_state_label(status),
-                    "startedAt": started_at,
-                    "lastActivityAt": last_activity_at,
-                }
-            )
+            agents.append(self._agent_card(session_id, header, run, tasks))
 
         agents.sort(
             key=lambda item: parse_time(item.get("startedAt")) or datetime.min.replace(tzinfo=timezone.utc),
@@ -1540,6 +1866,175 @@ class EngineRunRepository:
             "agents": agents,
             "count": len(agents),
             "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _agent_card(
+        session_id: str, header: Dict[str, Any], run: Dict[str, Any], tasks: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        status = header.get("status") or run.get("status")
+        agent_id = str(header.get("agentId") or run.get("agentId") or "")
+        task_reference = header.get("taskId") or run.get("taskId")
+        task = tasks.get(str(task_reference), {}) if task_reference else {}
+        task_id = task.get("dxId") or task_reference
+        conversation_name = run.get("conversationName") or ""
+        task_title = task.get("title") or ""
+        started_at = header.get("startedAt") or run.get("startedAt")
+        return {
+            "runId": session_id,
+            "shortId": session_id[:8],
+            "agentId": agent_id,
+            "displayName": agent_display_name(agent_id),
+            "taskId": task_id,
+            "taskTitle": clean_inline(task_title, 140),
+            "conversationName": clean_inline(conversation_name, 160),
+            "workingOn": agent_work_label(agent_id, task_id, task_title, conversation_name),
+            "status": str(status or "Active"),
+            "statusLabel": agent_state_label(status),
+            "startedAt": started_at,
+            "completedAt": header.get("completedAt") or run.get("completedAt"),
+            "lastActivityAt": header.get("lastActivityAt") or started_at,
+        }
+
+    def _copilot_candidates(self, task_id: Any, started_at: Any) -> List[Tuple[float, Path]]:
+        start = parse_time(started_at)
+        root = self.copilot_state_root
+        if start is None or not root.is_dir():
+            return []
+        earliest = start.timestamp() - COPILOT_MATCH_WINDOW_SECONDS
+        task_re = re.compile(r"#{}\b".format(re.escape(str(task_id))), re.IGNORECASE) if task_id else None
+        candidates: List[Tuple[float, Path]] = []
+        try:
+            entries = list(os.scandir(root))
+        except OSError:
+            return []
+        for entry in entries:
+            try:
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                yaml_path = Path(entry.path) / "workspace.yaml"
+                if yaml_path.stat().st_mtime < earliest:
+                    continue
+                text = yaml_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            fields = dict(
+                (match.group(1), match.group(2).strip())
+                for match in re.finditer(r"^([a-z_]+):[ \t]*(.*)$", text, flags=re.MULTILINE)
+            )
+            if fields.get("client_name") != COPILOT_CLIENT_NAME:
+                continue
+            try:
+                if Path(fields.get("cwd", "")).expanduser().resolve() != self.workspace:
+                    continue
+            except (OSError, RuntimeError):
+                continue
+            created = parse_time(fields.get("created_at"))
+            if created is None:
+                continue
+            delta = abs((created - start).total_seconds())
+            if delta > COPILOT_MATCH_WINDOW_SECONDS:
+                continue
+            if task_re and not task_re.search(text):
+                continue
+            candidates.append((delta, Path(entry.path)))
+        candidates.sort(key=lambda item: item[0])
+        return candidates
+
+    def _find_copilot_session(self, run_id: str, task_id: Any, started_at: Any) -> Optional[Path]:
+        cached = self._copilot_sessions.get(run_id)
+        if cached is not None and (cached / "events.jsonl").is_file():
+            return cached
+        candidates = self._copilot_candidates(task_id, started_at)
+        needle = run_id.encode("utf-8")
+        for _, session_dir in candidates:
+            try:
+                if needle in (session_dir / "events.jsonl").read_bytes():
+                    self._copilot_sessions[run_id] = session_dir
+                    return session_dir
+            except OSError:
+                continue
+        # Early in a run the claim result naming the run may not be written yet.
+        # Use the closest unambiguous match without caching it.
+        if len(candidates) == 1 and (candidates[0][1] / "events.jsonl").is_file():
+            return candidates[0][1]
+        return None
+
+    def get_agent_session(self, run_id: str) -> Optional[Dict[str, Any]]:
+        if not AGENT_RUN_ID_RE.fullmatch(run_id or ""):
+            return None
+        session_path = self.sessions_root / "{}.json".format(run_id)
+        run_path = self.agent_runs_root / "{}.json".format(run_id)
+        session = self._read_json(session_path) or {}
+        run = self._read_json(run_path) or {}
+        if not session and not run:
+            return None
+        header = session.get("header") if isinstance(session.get("header"), dict) else {}
+        card = self._agent_card(run_id, header, run, self._task_lookup())
+        live = normalized_agent_state(card["status"]) in ACTIVE_AGENT_STATES
+
+        with self._lock:
+            copilot_dir = self._find_copilot_session(
+                run_id, header.get("taskId") or run.get("taskId") or card["taskId"], card["startedAt"]
+            )
+            events_path = copilot_dir / "events.jsonl" if copilot_dir else None
+            try:
+                events_stat = events_path.stat() if events_path else None
+                session_stat = session_path.stat() if session_path.exists() else None
+            except OSError:
+                events_stat = session_stat = None
+            signature = (
+                events_stat.st_size if events_stat else 0,
+                events_stat.st_mtime_ns if events_stat else 0,
+                session_stat.st_size if session_stat else 0,
+                session_stat.st_mtime_ns if session_stat else 0,
+            )
+            cached = self._agent_cache.get(run_id)
+            if cached and cached[0] == signature:
+                parsed = cached[1]
+            else:
+                prompt: Optional[str] = None
+                malformed = 0
+                if events_path is not None:
+                    try:
+                        with events_path.open("r", encoding="utf-8", errors="replace") as stream:
+                            events, prompt, malformed = copilot_events_to_engine(stream)
+                    except OSError:
+                        events = []
+                    source = "copilot-session"
+                else:
+                    events = acp_events_to_engine(session.get("events") or [])
+                    source = "discovery-session"
+                meta = {
+                    "definitionId": "agent",
+                    "instanceId": run_id,
+                    "state": card["status"],
+                    "startedAt": card["startedAt"],
+                    "completedAt": card["completedAt"],
+                    "prompt": prompt,
+                }
+                result = self.parser.parse(self.sessions_root, meta, signature, events=events, coalesce=False)
+                timeline = [item for turn in result["turns"] for item in turn["timeline"]]
+                stats = dict(result["stats"])
+                stats["malformedLinesIgnored"] = malformed
+                stats.pop("turns", None)
+                parsed = {
+                    "startingPrompt": result["startingPrompt"],
+                    "timeline": timeline,
+                    "stats": stats,
+                    "source": source,
+                    "updatedAt": result["run"]["updatedAt"],
+                }
+                self._agent_cache[run_id] = (signature, parsed)
+
+        status_key = hashlib.sha256(json.dumps(card, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:12]
+        return {
+            **parsed,
+            "agent": {
+                **card,
+                "isLive": live,
+                "version": "{}-{}".format("-".join(map(str, signature)), status_key),
+            },
         }
 
     @staticmethod
@@ -1605,16 +2100,13 @@ class EngineRunRepository:
         with self._lock:
             cached = self._cache.get(key)
             if cached and cached[0] == signature:
-                cached[1]["run"]["isLive"] = is_live_state(
-                    cached[1]["run"].get("state"), cached[1]["run"].get("updatedAt")
-                )
-                return cached[1]
+                return self._present_run(cached[1], signature)
             meta = self._read_meta(run_dir)
             if not meta:
                 return None
             parsed = self.parser.parse(run_dir, meta, signature)
             self._cache[key] = (signature, parsed)
-            return parsed
+            return self._present_run(parsed, signature)
 
 
 class EngineChatHTTPServer(ThreadingHTTPServer):
@@ -1660,6 +2152,14 @@ class EngineChatHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/agents":
             self.send_json(self.repository.list_active_agents())
+            return
+        if path.startswith("/api/agents/"):
+            parts = path.strip("/").split("/")
+            payload = self.repository.get_agent_session(parts[2]) if len(parts) == 3 else None
+            if payload is not None:
+                self.send_json(payload)
+                return
+            self.send_json({"error": "Agent session not found"}, status=404)
             return
         if path.startswith("/api/runs/"):
             parts = path.strip("/").split("/")
@@ -1794,7 +2294,7 @@ class TerminationRequested(Exception):
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Serve Engine Chat 0.1.0-experimental on loopback. Tested with Discovery 0.15.19 "
+            "Serve Engine Chat 0.2.0-experimental on loopback. Tested with Discovery 0.15.21 "
             "on macOS; other versions and platforms are untested."
         )
     )

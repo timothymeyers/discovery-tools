@@ -52,7 +52,7 @@ class EngineChatManagerTests(unittest.TestCase):
         self.assertEqual("current", second["stateAfter"])
         self.assertEqual(metadata_before, metadata_after)
         self.assertEqual(manager.PACKAGE_VERSION, metadata_after["packageVersion"])
-        self.assertEqual("0.15.19", metadata_after["testedCompatibility"]["discoveryVersion"])
+        self.assertEqual("0.15.21", metadata_after["testedCompatibility"]["discoveryVersion"])
         self.assertEqual("macOS", metadata_after["testedCompatibility"]["operatingSystem"])
         self.assertEqual(
             manager.load_manifest()["payloadHashes"],
