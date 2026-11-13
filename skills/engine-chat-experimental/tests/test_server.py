@@ -6,6 +6,7 @@ import threading
 import unittest
 from pathlib import Path
 from unittest import mock
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 
@@ -998,7 +999,7 @@ class EngineChatServerTests(unittest.TestCase):
 
         self.assertTrue(payload["ok"])
         self.assertEqual("engine-chat", payload["serviceId"])
-        self.assertEqual("0.1.0-experimental", payload["engineChatVersion"])
+        self.assertEqual("0.2.0-experimental", payload["engineChatVersion"])
         self.assertEqual("1", payload["protocolVersion"])
         self.assertEqual("0.15.21", payload["testedDiscoveryVersion"])
         self.assertEqual("macOS", payload["testedOperatingSystem"])
@@ -1041,6 +1042,105 @@ class EngineChatServerTests(unittest.TestCase):
                 child.unlink()
             outside_run.rmdir()
             outside.rmdir()
+
+
+class AgentSessionTests(unittest.TestCase):
+    RUN_ID = "run-abc12345"
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        root = Path(self.temp.name).resolve()
+        self.workspace = root / "ws"
+        self.state = root / "state"
+        discovery = self.workspace / ".discovery"
+        (discovery / "sessions").mkdir(parents=True)
+        (discovery / "agent-runs").mkdir(parents=True)
+        self.state.mkdir()
+        (discovery / "sessions" / "{}.json".format(self.RUN_ID)).write_text(json.dumps({
+            "header": {"sessionId": self.RUN_ID, "agentId": "catalog/batteries-included",
+                       "taskId": "DX-16", "status": "running",
+                       "startedAt": "2026-10-24T10:00:00+00:00"},
+            "events": [],
+        }), encoding="utf-8")
+        env = mock.patch.dict(os.environ, {"ENGINE_CHAT_COPILOT_STATE": str(self.state)})
+        env.start()
+        self.addCleanup(env.stop)
+        self.addCleanup(self.temp.cleanup)
+
+    def write_copilot_session(self, name, created_at="2026-10-24T10:00:01Z", client="discovery-express", events=None):
+        folder = self.state / name
+        folder.mkdir()
+        (folder / "workspace.yaml").write_text(
+            "cwd: {}\nclient_name: {}\nname: Work on #DX-16\ncreated_at: {}\n".format(self.workspace, client, created_at),
+            encoding="utf-8",
+        )
+        lines = events if events is not None else [
+            {"type": "user.message", "data": {"content": "Claim {} and finish DX-16.".format(self.RUN_ID)}},
+            {"type": "assistant.message", "timestamp": "2026-10-24T10:00:05Z",
+             "data": {"reasoningText": "Plan the work.", "content": "Starting now."}},
+            {"type": "tool.execution_start", "timestamp": "2026-10-24T10:00:06Z",
+             "data": {"toolCallId": "c1", "toolName": "bash",
+                      "arguments": {"command": "ls", "description": "List files"}}},
+            {"type": "tool.execution_complete", "timestamp": "2026-10-24T10:00:07Z",
+             "data": {"toolCallId": "c1", "success": True}},
+        ]
+        (folder / "events.jsonl").write_text("\n".join(json.dumps(e) for e in lines) + "\nnot json\n", encoding="utf-8")
+        return folder
+
+    def test_live_copilot_session_is_flattened_without_turns(self):
+        self.write_copilot_session("s1")
+        payload = server.EngineRunRepository(self.workspace).get_agent_session(self.RUN_ID)
+
+        self.assertEqual("copilot-session", payload["source"])
+        self.assertIn("finish DX-16", payload["startingPrompt"])
+        self.assertNotIn("turns", payload["stats"])
+        self.assertEqual(1, payload["stats"]["malformedLinesIgnored"])
+        self.assertTrue(payload["agent"]["isLive"])
+        text = json.dumps(payload["timeline"])
+        self.assertIn("Plan the work.", text)
+        self.assertIn("List files", text)
+
+    def test_sessions_from_other_clients_or_times_are_ignored(self):
+        self.write_copilot_session("other-client", client="vscode")
+        self.write_copilot_session("too-late", created_at="2026-10-24T11:00:00Z")
+        payload = server.EngineRunRepository(self.workspace).get_agent_session(self.RUN_ID)
+        self.assertEqual("discovery-session", payload["source"])
+
+    def test_session_naming_the_run_wins_over_closer_candidate(self):
+        self.write_copilot_session("closer", created_at="2026-10-24T10:00:00Z", events=[
+            {"type": "user.message", "data": {"content": "Different run."}},
+        ])
+        self.write_copilot_session("named")
+        repository = server.EngineRunRepository(self.workspace)
+        self.assertEqual(self.state / "named", repository._find_copilot_session(
+            self.RUN_ID, "DX-16", "2026-10-24T10:00:00+00:00"))
+
+    def test_invalid_or_unknown_ids_return_none(self):
+        repository = server.EngineRunRepository(self.workspace)
+        for run_id in ("../etc", "a/b/c/d/e", "short", "x" * 65, "run-missing1"):
+            self.assertIsNone(repository.get_agent_session(run_id))
+
+    def test_tool_titles(self):
+        self.assertEqual("Using skill: docx", server.copilot_tool_title({"toolName": "skill"}, {"skill": "docx"}))
+        self.assertEqual("view", server.copilot_tool_title({"toolName": "view"}, {"path": "/x"}))
+        self.assertEqual("List files", server.copilot_tool_title({"toolName": "bash"}, {"description": "List files"}))
+
+    def test_route_returns_agent_session_and_404(self):
+        self.write_copilot_session("s1")
+        httpd = server.create_server(self.workspace, 0)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        try:
+            base = "http://127.0.0.1:{}".format(httpd.server_address[1])
+            with urlopen(base + "/api/agents/" + self.RUN_ID, timeout=2) as response:
+                self.assertEqual(self.RUN_ID, json.loads(response.read())["agent"]["runId"])
+            with self.assertRaises(HTTPError) as caught:
+                urlopen(base + "/api/agents/run-missing1", timeout=2)
+            self.assertEqual(404, caught.exception.code)
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            thread.join(timeout=2)
 
 
 if __name__ == "__main__":

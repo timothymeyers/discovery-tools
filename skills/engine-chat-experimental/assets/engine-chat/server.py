@@ -19,7 +19,7 @@ from urllib.parse import unquote, urlparse
 
 
 SERVICE_ID = "engine-chat"
-ENGINE_CHAT_VERSION = "0.1.0-experimental"
+ENGINE_CHAT_VERSION = "0.2.0-experimental"
 PROTOCOL_VERSION = "1"
 TESTED_DISCOVERY_VERSION = "0.15.21"
 TESTED_OS = "macOS"
@@ -28,6 +28,9 @@ TERMINAL_STATES = {"cancelled", "completed", "failed", "stopped"}
 IDLE_LIVE_WINDOW_SECONDS = 30 * 60
 ACTIVE_AGENT_STATES = {"running", "queued", "pending", "starting", "waiting", "permissionneeded"}
 RUN_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+AGENT_RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+COPILOT_CLIENT_NAME = "discovery-express"
+COPILOT_MATCH_WINDOW_SECONDS = 120
 JSON_FENCE_RE = re.compile(r"```json\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 MARKDOWN_LINK_RE = re.compile(r"\[([^\]]+)\]\([^\)]+\)")
 SOURCE_REF_RE = re.compile(r"\s*\[source:\s*[^\]]+\]", re.IGNORECASE)
@@ -1171,7 +1174,14 @@ class EngineRunParser:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
 
-    def parse(self, run_dir: Path, meta: Dict[str, Any], signature: Tuple[int, int, int, int]) -> Dict[str, Any]:
+    def parse(
+        self,
+        run_dir: Path,
+        meta: Dict[str, Any],
+        signature: Tuple[int, int, int, int],
+        events: Optional[List[Dict[str, Any]]] = None,
+        coalesce: bool = True,
+    ) -> Dict[str, Any]:
         output_path = run_dir / "output.jsonl"
         turns: List[Dict[str, Any]] = []
         current: Optional[Dict[str, Any]] = None
@@ -1286,22 +1296,23 @@ class EngineRunParser:
             current = None
             pending = defaultdict(deque)
 
-        if output_path.exists():
-            parsed_events: List[Dict[str, Any]] = []
-            with output_path.open("r", encoding="utf-8", errors="replace") as stream:
-                for line in stream:
-                    if not line.strip():
-                        continue
-                    try:
-                        event = json.loads(line)
-                    except json.JSONDecodeError:
-                        malformed_lines += 1
-                        continue
-                    if not isinstance(event, dict):
-                        continue
-                    parsed_events.append(event)
+        if events is not None or output_path.exists():
+            parsed_events: List[Dict[str, Any]] = list(events or [])
+            if events is None:
+                with output_path.open("r", encoding="utf-8", errors="replace") as stream:
+                    for line in stream:
+                        if not line.strip():
+                            continue
+                        try:
+                            event = json.loads(line)
+                        except json.JSONDecodeError:
+                            malformed_lines += 1
+                            continue
+                        if not isinstance(event, dict):
+                            continue
+                        parsed_events.append(event)
 
-            for event in coalesce_streaming_text_events(parsed_events):
+            for event in (coalesce_streaming_text_events(parsed_events) if coalesce else parsed_events):
                 kind = str(event.get("kind", ""))
                 timestamp = event.get("timestamp")
                 if isinstance(timestamp, str):
@@ -1591,6 +1602,90 @@ def valid_run_id(value: str) -> bool:
     return bool(value not in {".", ".."} and RUN_ID_RE.fullmatch(value))
 
 
+def tool_event(kind: str, name: str, document: Dict[str, Any], timestamp: Any, sequence: int) -> Dict[str, Any]:
+    content = "**{}**\n```json\n{}\n```".format(name, json.dumps(document, ensure_ascii=False, default=str))
+    return {"kind": kind, "content": content, "timestamp": timestamp, "sequence": sequence}
+
+
+def copilot_tool_title(data: Dict[str, Any], arguments: Dict[str, Any]) -> str:
+    """Pick the title that summarize_action turns into the friendliest label."""
+    name = str(data.get("toolName") or "")
+    if name == "skill" and arguments.get("skill"):
+        return "Using skill: {}".format(arguments["skill"])
+    if name.startswith("discovery-") or arguments.get("path") or arguments.get("filePath"):
+        return name
+    if arguments.get("description"):
+        return clean_inline(arguments["description"], 160)
+    return str(data.get("toolTitle") or name or "tool")
+
+
+def copilot_events_to_engine(lines: Iterable[str]) -> Tuple[List[Dict[str, Any]], Optional[str], int]:
+    """Translate a Copilot session events.jsonl into Engine Chat parser events."""
+    events: List[Dict[str, Any]] = []
+    tool_names: Dict[str, str] = {}
+    prompt: Optional[str] = None
+    malformed = 0
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            malformed += 1
+            continue
+        if not isinstance(record, dict):
+            continue
+        kind = record.get("type")
+        data = record.get("data") if isinstance(record.get("data"), dict) else {}
+        timestamp = record.get("timestamp")
+        sequence = len(events) + 1
+        if kind == "user.message" and prompt is None:
+            prompt = str(data.get("content") or "")
+        elif kind == "assistant.message":
+            reasoning = str(data.get("reasoningText") or "")
+            if reasoning.strip():
+                events.append({"kind": "Thinking", "content": reasoning, "timestamp": timestamp, "sequence": sequence})
+            message = str(data.get("content") or "")
+            if message.strip():
+                events.append({"kind": "Observation", "content": message, "timestamp": timestamp, "sequence": len(events) + 1})
+        elif kind == "tool.execution_start":
+            call_id = str(data.get("toolCallId") or "")
+            arguments = data.get("arguments")
+            name = copilot_tool_title(data, arguments if isinstance(arguments, dict) else {})
+            tool_names[call_id] = name
+            events.append(tool_event("ActionProposed", name, {"rawInput": arguments if isinstance(arguments, dict) else {}}, timestamp, sequence))
+        elif kind == "tool.execution_complete":
+            name = tool_names.pop(str(data.get("toolCallId") or ""), None)
+            if name is None:
+                continue
+            status = "failed" if data.get("success") is False else "completed"
+            events.append(tool_event("ActionApplied", name, {"status": status}, timestamp, sequence))
+    return events, prompt, malformed
+
+
+def acp_events_to_engine(records: Iterable[Any]) -> List[Dict[str, Any]]:
+    """Translate the completion-time ACP projection in .discovery/sessions."""
+    events: List[Dict[str, Any]] = []
+    text_kinds = {"agent_thought_chunk": "Thinking", "agent_message_chunk": "Observation"}
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        acp_kind = record.get("acpKind")
+        text = str(record.get("text") or "")
+        timestamp = record.get("recordedAt")
+        kind = text_kinds.get(str(acp_kind))
+        if kind:
+            if events and events[-1]["kind"] == kind:
+                events[-1]["content"] += text
+            else:
+                events.append({"kind": kind, "content": text, "timestamp": timestamp, "sequence": len(events) + 1})
+        elif acp_kind == "tool_call_update" and text.startswith("Proposed:"):
+            name = text.split(":", 1)[1].strip() or "tool"
+            events.append(tool_event("ActionProposed", name, {"rawInput": {}}, timestamp, len(events) + 1))
+            events.append(tool_event("ActionApplied", name, {"status": "completed"}, timestamp, len(events) + 1))
+    return events
+
+
 class EngineRunRepository:
     def __init__(self, workspace: Path):
         self.workspace = workspace.resolve()
@@ -1598,8 +1693,13 @@ class EngineRunRepository:
         self.sessions_root = self.workspace / ".discovery" / "sessions"
         self.agent_runs_root = self.workspace / ".discovery" / "agent-runs"
         self.tasks_index_path = self.workspace / ".discovery" / "tasks" / "index.json"
+        self.copilot_state_root = Path(
+            os.environ.get("ENGINE_CHAT_COPILOT_STATE") or Path.home() / ".copilot" / "session-state"
+        )
         self.parser = EngineRunParser(self.workspace)
         self._cache: Dict[Tuple[str, str], Tuple[Tuple[int, int, int, int], Dict[str, Any]]] = {}
+        self._agent_cache: Dict[str, Tuple[Tuple[int, int, int, int], Dict[str, Any]]] = {}
+        self._copilot_sessions: Dict[str, Path] = {}
         self._lock = threading.RLock()
 
     def _safe_run_dir(self, definition_id: str, instance_id: str) -> Optional[Path]:
@@ -1756,30 +1856,7 @@ class EngineRunRepository:
 
             session_id = str(header.get("sessionId") or header.get("legacyRunId") or session_path.stem)
             run = self._read_json(self.agent_runs_root / "{}.json".format(session_id)) or {}
-            agent_id = str(header.get("agentId") or run.get("agentId") or "")
-            task_reference = header.get("taskId") or run.get("taskId")
-            task = tasks.get(str(task_reference), {}) if task_reference else {}
-            task_id = task.get("dxId") or task_reference
-            conversation_name = run.get("conversationName") or ""
-            task_title = task.get("title") or ""
-            started_at = header.get("startedAt") or run.get("startedAt")
-            last_activity_at = header.get("lastActivityAt") or started_at
-            agents.append(
-                {
-                    "runId": session_id,
-                    "shortId": session_id[:8],
-                    "agentId": agent_id,
-                    "displayName": agent_display_name(agent_id),
-                    "taskId": task_id,
-                    "taskTitle": clean_inline(task_title, 140),
-                    "conversationName": clean_inline(conversation_name, 160),
-                    "workingOn": agent_work_label(agent_id, task_id, task_title, conversation_name),
-                    "status": str(status or "Active"),
-                    "statusLabel": agent_state_label(status),
-                    "startedAt": started_at,
-                    "lastActivityAt": last_activity_at,
-                }
-            )
+            agents.append(self._agent_card(session_id, header, run, tasks))
 
         agents.sort(
             key=lambda item: parse_time(item.get("startedAt")) or datetime.min.replace(tzinfo=timezone.utc),
@@ -1789,6 +1866,175 @@ class EngineRunRepository:
             "agents": agents,
             "count": len(agents),
             "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def _agent_card(
+        session_id: str, header: Dict[str, Any], run: Dict[str, Any], tasks: Dict[str, Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        status = header.get("status") or run.get("status")
+        agent_id = str(header.get("agentId") or run.get("agentId") or "")
+        task_reference = header.get("taskId") or run.get("taskId")
+        task = tasks.get(str(task_reference), {}) if task_reference else {}
+        task_id = task.get("dxId") or task_reference
+        conversation_name = run.get("conversationName") or ""
+        task_title = task.get("title") or ""
+        started_at = header.get("startedAt") or run.get("startedAt")
+        return {
+            "runId": session_id,
+            "shortId": session_id[:8],
+            "agentId": agent_id,
+            "displayName": agent_display_name(agent_id),
+            "taskId": task_id,
+            "taskTitle": clean_inline(task_title, 140),
+            "conversationName": clean_inline(conversation_name, 160),
+            "workingOn": agent_work_label(agent_id, task_id, task_title, conversation_name),
+            "status": str(status or "Active"),
+            "statusLabel": agent_state_label(status),
+            "startedAt": started_at,
+            "completedAt": header.get("completedAt") or run.get("completedAt"),
+            "lastActivityAt": header.get("lastActivityAt") or started_at,
+        }
+
+    def _copilot_candidates(self, task_id: Any, started_at: Any) -> List[Tuple[float, Path]]:
+        start = parse_time(started_at)
+        root = self.copilot_state_root
+        if start is None or not root.is_dir():
+            return []
+        earliest = start.timestamp() - COPILOT_MATCH_WINDOW_SECONDS
+        task_re = re.compile(r"#{}\b".format(re.escape(str(task_id))), re.IGNORECASE) if task_id else None
+        candidates: List[Tuple[float, Path]] = []
+        try:
+            entries = list(os.scandir(root))
+        except OSError:
+            return []
+        for entry in entries:
+            try:
+                if not entry.is_dir(follow_symlinks=False):
+                    continue
+                yaml_path = Path(entry.path) / "workspace.yaml"
+                if yaml_path.stat().st_mtime < earliest:
+                    continue
+                text = yaml_path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            fields = dict(
+                (match.group(1), match.group(2).strip())
+                for match in re.finditer(r"^([a-z_]+):[ \t]*(.*)$", text, flags=re.MULTILINE)
+            )
+            if fields.get("client_name") != COPILOT_CLIENT_NAME:
+                continue
+            try:
+                if Path(fields.get("cwd", "")).expanduser().resolve() != self.workspace:
+                    continue
+            except (OSError, RuntimeError):
+                continue
+            created = parse_time(fields.get("created_at"))
+            if created is None:
+                continue
+            delta = abs((created - start).total_seconds())
+            if delta > COPILOT_MATCH_WINDOW_SECONDS:
+                continue
+            if task_re and not task_re.search(text):
+                continue
+            candidates.append((delta, Path(entry.path)))
+        candidates.sort(key=lambda item: item[0])
+        return candidates
+
+    def _find_copilot_session(self, run_id: str, task_id: Any, started_at: Any) -> Optional[Path]:
+        cached = self._copilot_sessions.get(run_id)
+        if cached is not None and (cached / "events.jsonl").is_file():
+            return cached
+        candidates = self._copilot_candidates(task_id, started_at)
+        needle = run_id.encode("utf-8")
+        for _, session_dir in candidates:
+            try:
+                if needle in (session_dir / "events.jsonl").read_bytes():
+                    self._copilot_sessions[run_id] = session_dir
+                    return session_dir
+            except OSError:
+                continue
+        # Early in a run the claim result naming the run may not be written yet.
+        # Use the closest unambiguous match without caching it.
+        if len(candidates) == 1 and (candidates[0][1] / "events.jsonl").is_file():
+            return candidates[0][1]
+        return None
+
+    def get_agent_session(self, run_id: str) -> Optional[Dict[str, Any]]:
+        if not AGENT_RUN_ID_RE.fullmatch(run_id or ""):
+            return None
+        session_path = self.sessions_root / "{}.json".format(run_id)
+        run_path = self.agent_runs_root / "{}.json".format(run_id)
+        session = self._read_json(session_path) or {}
+        run = self._read_json(run_path) or {}
+        if not session and not run:
+            return None
+        header = session.get("header") if isinstance(session.get("header"), dict) else {}
+        card = self._agent_card(run_id, header, run, self._task_lookup())
+        live = normalized_agent_state(card["status"]) in ACTIVE_AGENT_STATES
+
+        with self._lock:
+            copilot_dir = self._find_copilot_session(
+                run_id, header.get("taskId") or run.get("taskId") or card["taskId"], card["startedAt"]
+            )
+            events_path = copilot_dir / "events.jsonl" if copilot_dir else None
+            try:
+                events_stat = events_path.stat() if events_path else None
+                session_stat = session_path.stat() if session_path.exists() else None
+            except OSError:
+                events_stat = session_stat = None
+            signature = (
+                events_stat.st_size if events_stat else 0,
+                events_stat.st_mtime_ns if events_stat else 0,
+                session_stat.st_size if session_stat else 0,
+                session_stat.st_mtime_ns if session_stat else 0,
+            )
+            cached = self._agent_cache.get(run_id)
+            if cached and cached[0] == signature:
+                parsed = cached[1]
+            else:
+                prompt: Optional[str] = None
+                malformed = 0
+                if events_path is not None:
+                    try:
+                        with events_path.open("r", encoding="utf-8", errors="replace") as stream:
+                            events, prompt, malformed = copilot_events_to_engine(stream)
+                    except OSError:
+                        events = []
+                    source = "copilot-session"
+                else:
+                    events = acp_events_to_engine(session.get("events") or [])
+                    source = "discovery-session"
+                meta = {
+                    "definitionId": "agent",
+                    "instanceId": run_id,
+                    "state": card["status"],
+                    "startedAt": card["startedAt"],
+                    "completedAt": card["completedAt"],
+                    "prompt": prompt,
+                }
+                result = self.parser.parse(self.sessions_root, meta, signature, events=events, coalesce=False)
+                timeline = [item for turn in result["turns"] for item in turn["timeline"]]
+                stats = dict(result["stats"])
+                stats["malformedLinesIgnored"] = malformed
+                stats.pop("turns", None)
+                parsed = {
+                    "startingPrompt": result["startingPrompt"],
+                    "timeline": timeline,
+                    "stats": stats,
+                    "source": source,
+                    "updatedAt": result["run"]["updatedAt"],
+                }
+                self._agent_cache[run_id] = (signature, parsed)
+
+        status_key = hashlib.sha256(json.dumps(card, sort_keys=True, default=str).encode("utf-8")).hexdigest()[:12]
+        return {
+            **parsed,
+            "agent": {
+                **card,
+                "isLive": live,
+                "version": "{}-{}".format("-".join(map(str, signature)), status_key),
+            },
         }
 
     @staticmethod
@@ -1906,6 +2152,14 @@ class EngineChatHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/agents":
             self.send_json(self.repository.list_active_agents())
+            return
+        if path.startswith("/api/agents/"):
+            parts = path.strip("/").split("/")
+            payload = self.repository.get_agent_session(parts[2]) if len(parts) == 3 else None
+            if payload is not None:
+                self.send_json(payload)
+                return
+            self.send_json({"error": "Agent session not found"}, status=404)
             return
         if path.startswith("/api/runs/"):
             parts = path.strip("/").split("/")
@@ -2040,7 +2294,7 @@ class TerminationRequested(Exception):
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Serve Engine Chat 0.1.0-experimental on loopback. Tested with Discovery 0.15.21 "
+            "Serve Engine Chat 0.2.0-experimental on loopback. Tested with Discovery 0.15.21 "
             "on macOS; other versions and platforms are untested."
         )
     )

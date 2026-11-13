@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "serviceId": "engine-chat",
-  "packageVersion": "0.1.0-experimental",
+  "packageVersion": "0.2.0-experimental",
   "protocolVersion": "1",
   "testedCompatibility": {
     "discoveryVersion": "0.15.21",
@@ -9,7 +9,7 @@
     "statement": "Tested with Discovery 0.15.21 on macOS; other versions and platforms are untested."
   },
   "payloadHashes": {
-    "index.html": "6e2912be3a768d84f60e8bd0ba615a9a158c30c3cc3753bf58a37a362bb54e42",
-    "server.py": "ab060539accb228a06a96bb32e5f4094d87bc37031e6e56cfe71d301fb6012f2"
+    "index.html": "4b80707a3db332bb1827f0b7b6293e6c8feb6f9ad64dd4eed27e4e822dcb49be",
+    "server.py": "f7be0a4b4912b0491008da89c72a49b73f8f59d0e0685a7a83837fd5f8df77c6"
   }
 }

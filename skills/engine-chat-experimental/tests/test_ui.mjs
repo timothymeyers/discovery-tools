@@ -9,9 +9,12 @@ const script = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)]
   .find((source) => source.includes("const POLL_INTERVAL_MS"));
 assert.ok(script, "Engine Chat application script is present");
 
-function loadRenderer() {
+function loadRenderer(search = "") {
   const nodes = new Map();
+  const bodyClasses = new Set();
   const document = {
+    title: "",
+    body: { classList: { add(name) { bodyClasses.add(name); }, contains(name) { return bodyClasses.has(name); } } },
     getElementById(id) {
       if (!nodes.has(id)) {
         nodes.set(id, {
@@ -20,6 +23,7 @@ function loadRenderer() {
           listeners: new Map(),
           addEventListener(type, callback) { this.listeners.set(type, callback); },
           setAttribute() {},
+          closest() { return { setAttribute() {} }; },
           querySelectorAll() { return []; },
           scrollTo() {},
         });
@@ -29,6 +33,8 @@ function loadRenderer() {
   };
   const sandbox = {
     document,
+    URLSearchParams,
+    window: { location: { search } },
     setInterval() {},
     requestAnimationFrame(callback) { callback(); },
     // Keep startup polling inert: these tests exercise rendering, not networking.
@@ -39,11 +45,12 @@ function loadRenderer() {
       state, renderFeed, renderSteeringMessages, turnStatus, actionState,
       activeAttention, effectiveRunStatus, updateHeaderStatus, updateActionRequired,
       reviewLatestUpdate, renderRunOptions, refreshSelectedRun,
+      renderActiveAgents, renderAgentFeed, refreshAgentSession,
     };
   })();`);
   vm.runInNewContext(instrumented, sandbox, { timeout: 1000 });
   assert.ok(sandbox.renderer, "Private rendering functions were exposed to the test harness");
-  return { ...sandbox.renderer, nodes, setFetch(fetch) { sandbox.fetch = fetch; } };
+  return { ...sandbox.renderer, nodes, document, setFetch(fetch) { sandbox.fetch = fetch; } };
 }
 
 const receivedAt = "2026-10-24T10:00:02+00:00";
@@ -389,4 +396,59 @@ test("a delayed response for another run cannot restore its approval banner", as
   assert.equal(ui.state.runData, null);
   assert.equal(ui.state.version, null);
   assert.equal(ui.state.loading, false);
+});
+
+function agentSession(overrides = {}) {
+  return {
+    startingPrompt: "Complete DX-16.",
+    source: "copilot-session",
+    updatedAt: "2026-10-24T10:05:00+00:00",
+    stats: { actions: 1 },
+    timeline: [
+      { id: "t1", type: "thinking", summary: "Reading the task.", startedAt: "2026-10-24T10:01:00+00:00" },
+    ],
+    agent: {
+      runId: "run-abc12345", shortId: "abc12345", displayName: "Researcher", taskId: "DX-16",
+      taskTitle: "Draft summary", status: "running", statusLabel: "Working", isLive: true,
+      startedAt: "2026-10-24T10:00:00+00:00", version: "v1",
+    },
+    ...overrides,
+  };
+}
+
+test("active agent cards open the agent session in a new tab", () => {
+  const ui = loadRenderer("?clawpilotTheme=light");
+  ui.renderActiveAgents({ agents: [{
+    runId: "run-abc12345", displayName: "Researcher", workingOn: "DX-16", statusLabel: "Working",
+    startedAt: "2026-10-24T10:00:00+00:00",
+  }] });
+  const markup = ui.nodes.get("agent-list").innerHTML;
+  assert.match(markup, /class="agent-card-link" href="\/\?agent=run-abc12345&amp;clawpilotTheme=light" target="_blank" rel="noopener"/);
+});
+
+test("agent view renders the session without turn headers and stops polling when finished", async () => {
+  const ui = loadRenderer("?agent=run-abc12345");
+  assert.equal(ui.document.body.classList.contains("agent-view"), true);
+  ui.state.loading = false; // the startup poll never resolves in this harness
+  let calls = 0;
+  const finished = agentSession();
+  finished.agent = { ...finished.agent, isLive: false, status: "completed", statusLabel: "Completed", version: "v2" };
+  ui.setFetch(async (url) => {
+    calls += 1;
+    assert.equal(url, "/api/agents/run-abc12345");
+    return { ok: true, json: async () => finished };
+  });
+  await ui.refreshAgentSession();
+  const feed = ui.nodes.get("feed-inner").innerHTML;
+  assert.match(feed, /Reading the task\./);
+  assert.match(feed, /Complete DX-16\./);
+  assert.doesNotMatch(feed, /turn-header|Turn 1/);
+  assert.equal(ui.nodes.get("engine-title").textContent, "Researcher (DX-16)");
+  await ui.refreshAgentSession();
+  assert.equal(calls, 1);
+});
+
+test("agent view ignores an invalid agent id", () => {
+  const ui = loadRenderer("?agent=../etc/passwd");
+  assert.equal(ui.document.body.classList.contains("agent-view"), false);
 });

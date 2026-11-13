@@ -1,6 +1,6 @@
 # Engine Chat operations
 
-Engine Chat version: **0.1.0-experimental**. This package was tested with
+Engine Chat version: **0.2.0-experimental**. This package was tested with
 **Discovery 0.15.21 on macOS**. Other Discovery versions and operating systems
 are untested; this package makes no support claim for them.
 

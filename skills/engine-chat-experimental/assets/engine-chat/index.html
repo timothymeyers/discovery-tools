@@ -380,6 +380,42 @@
       box-shadow: var(--cp-card-shadow);
     }
 
+    .agent-card-link {
+      display: block;
+      color: inherit;
+      text-decoration: none;
+      border-radius: 16px;
+    }
+
+    .agent-card-link:hover .agent-card {
+      border-color: var(--cp-accent);
+    }
+
+    .agent-card-link:focus-visible {
+      outline: 2px solid var(--cp-accent);
+      outline-offset: 2px;
+    }
+
+    body.agent-view .workspace-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    body.agent-view .agent-rail,
+    body.agent-view .run-controls,
+    body.agent-view #composer-controls,
+    body.agent-view .action-required {
+      display: none;
+    }
+
+    .agent-live-line {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin: 18px 0 0;
+      color: var(--cp-text-muted);
+      font-size: 12px;
+    }
+
     .agent-card-top {
       display: grid;
       grid-template-columns: 34px minmax(0, 1fr);
@@ -1425,7 +1461,7 @@
             <div id="composer-controls">
               <div class="composer-label-row">
                 <span>Steering disabled</span>
-                <span class="preview-badge">0.1.0-experimental</span>
+                <span class="preview-badge">0.2.0-experimental</span>
               </div>
               <div class="composer-box">
                 <textarea disabled aria-label="Steering is disabled" placeholder="Steering is disabled in this experimental release."></textarea>
@@ -1468,7 +1504,11 @@
       const POLL_INTERVAL_MS = 1500;
       const RUN_LIST_INTERVAL_MS = 5000;
       const AGENT_POLL_INTERVAL_MS = 2500;
+      const pageParams = new URLSearchParams(window.location.search);
+      const AGENT_VIEW_ID = /^[A-Za-z0-9_-]{8,64}$/.test(pageParams.get("agent") || "") ? pageParams.get("agent") : null;
       const state = {
+        agentData: null,
+        agentVersion: null,
         runs: [],
         agents: [],
         agentSignature: null,
@@ -2000,6 +2040,7 @@
           const status = statusClass(agent.statusLabel);
           const detail = agent.taskTitle || agent.conversationName || "Delegated project work";
           return `
+            <a class="agent-card-link" href="${escapeHtml(agentSessionHref(agent.runId))}" target="_blank" rel="noopener" title="Open this agent's session in a new tab">
             <article class="agent-card" aria-label="${escapeHtml(`${agent.displayName}, ${agent.workingOn}, ${agent.statusLabel}`)}">
               <div class="agent-card-top">
                 <span class="agent-card-avatar" aria-hidden="true">🤖</span>
@@ -2014,8 +2055,81 @@
                 <span aria-hidden="true">·</span>
                 <span class="agent-elapsed" data-started-at="${escapeHtml(agent.startedAt || "")}">${escapeHtml(formatElapsed(agent.startedAt))}</span>
               </div>
-            </article>`;
+            </article>
+            </a>`;
         }).join("");
+      }
+
+      function agentSessionHref(runId) {
+        const params = new URLSearchParams({ agent: runId });
+        const theme = pageParams.get("clawpilotTheme");
+        if (theme) params.set("clawpilotTheme", theme);
+        return `/?${params.toString()}`;
+      }
+
+      function renderAgentFeed(data) {
+        const agent = data.agent;
+        const title = agent.taskId ? `${agent.displayName} (${agent.taskId})` : agent.displayName;
+        document.title = `${title} — Engine Chat`;
+        elements.engineTitle.textContent = title;
+        elements.statusLabel.textContent = agent.statusLabel;
+        elements.statusDot.className = `status-dot ${statusClass(agent.statusLabel)}`;
+        elements.runStatus.title = `Agent state: ${agent.status}`;
+        updateAgentSyncLine();
+
+        const key = `agent-${agent.runId}`;
+        const timeline = data.timeline || [];
+        const footer = agent.isLive
+          ? `<p class="agent-live-line"><span class="status-dot working" aria-hidden="true"></span>${escapeHtml(agent.displayName)} is ${escapeHtml(agent.statusLabel.toLowerCase())}…</p>`
+          : `<p class="agent-live-line">Session ${escapeHtml(agent.statusLabel.toLowerCase())}${agent.completedAt ? ` · ${escapeHtml(formatTime(agent.completedAt))}` : ""}</p>`;
+        elements.feedInner.innerHTML = `
+          <div class="date-divider">${escapeHtml(formatDate(agent.startedAt))}</div>
+          ${renderStartingPrompt(data.startingPrompt)}
+          <div class="stream-intro">
+            <div class="small-avatar" aria-hidden="true">🤖</div>
+            <div class="intro-copy">
+              <strong>${escapeHtml(agent.displayName)} started ${escapeHtml(agent.taskId ? `work on ${agent.taskId}` : "a session")}</strong>
+              <span>${escapeHtml(formatTime(agent.startedAt))} · Run ${escapeHtml(agent.shortId)}${agent.taskTitle ? ` · ${escapeHtml(agent.taskTitle)}` : ""}</span>
+            </div>
+          </div>
+          ${timeline.length
+            ? `<div class="event-stream">${timeline.map((entry) => renderTimelineEntry(key, entry)).join("")}</div>`
+            : '<div class="empty-card"><h2>No activity yet</h2><p>Waiting for the agent’s first update.</p></div>'}
+          ${footer}`;
+        bindDetailState();
+      }
+
+      function updateAgentSyncLine() {
+        const data = state.agentData;
+        if (!data) return;
+        elements.syncLine.textContent = `${data.stats.actions} actions · updated ${relativeTime(data.updatedAt || data.agent.lastActivityAt)}`;
+      }
+
+      async function refreshAgentSession() {
+        if (state.loading) return;
+        if (state.agentData && !state.agentData.agent.isLive) return;
+        state.loading = true;
+        try {
+          const data = await fetchJson(`/api/agents/${encodeURIComponent(AGENT_VIEW_ID)}`);
+          if (data.agent.version !== state.agentVersion) {
+            const shouldFollow = state.following && (!state.agentData || isNearBottom());
+            state.agentData = data;
+            state.agentVersion = data.agent.version;
+            renderAgentFeed(data);
+            elements.feed.setAttribute("aria-busy", "false");
+            if (shouldFollow) requestAnimationFrame(() => scrollToLatest("auto"));
+          }
+        } catch (error) {
+          if (!state.agentData) {
+            elements.feed.setAttribute("aria-busy", "false");
+            elements.statusLabel.textContent = "Reconnecting";
+            elements.statusDot.className = "status-dot paused";
+            elements.feedInner.innerHTML = `
+              <div class="error-state"><div class="empty-card"><h2>Agent session unavailable</h2><p>This agent session could not be found yet. Engine Chat will try again.</p></div></div>`;
+          }
+        } finally {
+          state.loading = false;
+        }
       }
 
       async function fetchJson(url) {
@@ -2159,7 +2273,7 @@
       elements.feed.addEventListener("scroll", () => {
         const nearBottom = isNearBottom();
         if (nearBottom) state.following = true;
-        else if (state.runData) state.following = false;
+        else if (state.runData || state.agentData) state.following = false;
         elements.jumpButton.hidden = nearBottom;
       }, { passive: true });
 
@@ -2172,13 +2286,23 @@
           updateHeaderStatus();
           elements.syncLine.textContent = `${state.runData.stats.turns} turns · ${state.runData.stats.actions} actions · updated ${relativeTime(state.runData.run.updatedAt)}`;
         }
+        updateAgentSyncLine();
       }, 1000);
 
-      setInterval(refreshSelectedRun, POLL_INTERVAL_MS);
-      setInterval(refreshRuns, RUN_LIST_INTERVAL_MS);
-      setInterval(refreshActiveAgents, AGENT_POLL_INTERVAL_MS);
-      refreshRuns();
-      refreshActiveAgents();
+      if (AGENT_VIEW_ID) {
+        document.body.classList.add("agent-view");
+        elements.engineTitle.textContent = "Agent session";
+        elements.syncLine.textContent = "Reading the agent session…";
+        elements.feed.closest(".conversation-column").setAttribute("aria-label", "Agent session");
+        setInterval(refreshAgentSession, POLL_INTERVAL_MS);
+        refreshAgentSession();
+      } else {
+        setInterval(refreshSelectedRun, POLL_INTERVAL_MS);
+        setInterval(refreshRuns, RUN_LIST_INTERVAL_MS);
+        setInterval(refreshActiveAgents, AGENT_POLL_INTERVAL_MS);
+        refreshRuns();
+        refreshActiveAgents();
+      }
     })();
   </script>
 </body>
