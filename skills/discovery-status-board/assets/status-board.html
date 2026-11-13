@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <title>Status — __TITLE__</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #002b36;
+      --cp-bg-elevated: #00252d;
+      --cp-surface: #00313b;
+      --cp-surface-soft: #073d47;
+      --cp-border: #164852;
+      --cp-border-strong: #2b6670;
+      --cp-text: #d7e0e2;
+      --cp-text-muted: #8fa7ab;
+      --cp-text-soft: #b7c8ca;
+      --cp-accent: #4ec9b0;
+      --cp-accent-soft: rgba(78, 201, 176, 0.14);
+      --cp-accent-fg: #001f27;
+      --cp-success: #4fd68b;
+      --cp-danger: #f48771;
+      --cp-warning: #dcdcaa;
+      --cp-link: #4fc1ff;
+      --cp-highlight: rgba(78, 201, 176, 0.16);
+    }
+    :root { --cp-card-shadow: 0 0 2px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.14); }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--cp-bg); color: var(--cp-text);
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    }
+    header {
+      position: sticky; top: 0; z-index: 5; background: var(--cp-bg-elevated);
+      border-bottom: 1px solid var(--cp-border); padding: 10px 16px;
+    }
+    .titlebar { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .titlebar h1 { font-size: 15px; margin: 0; }
+    .titlebar .meta { color: var(--cp-text-muted); font-size: 12px; margin-left: auto; }
+    button.ghost {
+      background: none; border: 1px solid var(--cp-border); color: var(--cp-text-muted);
+      border-radius: 6px; padding: 2px 8px; cursor: pointer; font: inherit; font-size: 12px;
+    }
+    button.ghost:hover { border-color: var(--cp-accent); color: var(--cp-text); }
+    .outcomes { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip {
+      display: flex; align-items: center; gap: 6px; padding: 4px 10px; max-width: 240px;
+      border: 1px solid var(--cp-border); border-radius: 999px; background: var(--cp-surface);
+      cursor: pointer; user-select: none;
+    }
+    .chip .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; border: 1px solid var(--cp-border-strong); }
+    .chip.green .dot { background: var(--cp-success); border-color: var(--cp-success); }
+    .chip.yellow .dot { background: var(--cp-warning); border-color: var(--cp-warning); }
+    .chip.red .dot { background: var(--cp-danger); border-color: var(--cp-danger); }
+    .chip b { flex: none; }
+    .chip span.t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--cp-text-soft); }
+    .chip.active { border-color: var(--cp-accent); background: var(--cp-accent-soft); }
+    .colheads, .row { display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); gap: 8px; }
+    .colheads { padding: 8px 16px 0; }
+    .colheads div { font-weight: 600; color: var(--cp-text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+    main { padding: 8px 16px 32px; }
+    .lane { border-left: 2px solid var(--cp-border); margin: 6px 0 6px 0; }
+    .lane > .lh {
+      display: flex; align-items: center; gap: 8px; padding: 5px 8px; cursor: pointer;
+      background: var(--cp-surface-soft); border-radius: 0 6px 6px 0;
+    }
+    .lane > .lh:hover { background: var(--cp-highlight); }
+    .lh .caret { width: 12px; color: var(--cp-text-muted); transition: transform .12s; }
+    .lane.collapsed > .lh .caret { transform: rotate(-90deg); }
+    .lh .dx { color: var(--cp-text-muted); font-variant-numeric: tabular-nums; }
+    .lh .ttl { font-weight: 600; }
+    .lh .st { font-size: 11px; color: var(--cp-text-muted); border: 1px solid var(--cp-border); border-radius: 4px; padding: 0 5px; }
+    .lh .counts { margin-left: auto; display: flex; gap: 4px; }
+    .lh .counts i {
+      font-style: normal; font-size: 11px; min-width: 22px; text-align: center; border-radius: 4px;
+      padding: 0 4px; background: var(--cp-surface); border: 1px solid var(--cp-border); color: var(--cp-text-muted);
+    }
+    .lh .counts i.z { opacity: .35; }
+    .lane > .body { padding: 6px 0 2px 10px; }
+    .lane.collapsed > .body { display: none; }
+    .cell { min-height: 4px; display: flex; flex-direction: column; gap: 6px; }
+    .card {
+      background: var(--cp-surface); border: 1px solid var(--cp-border); border-radius: 6px;
+      padding: 6px 8px; box-shadow: var(--cp-card-shadow); transition: opacity .12s;
+    }
+    .card .top { display: flex; gap: 6px; align-items: baseline; }
+    .card .dx { color: var(--cp-text-muted); font-size: 11px; flex: none; }
+    .card .ttl { font-weight: 500; }
+    .card .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+    .tag { font-size: 10.5px; border-radius: 4px; padding: 0 5px; border: 1px solid var(--cp-border); color: var(--cp-text-muted); }
+    .tag.reason { border-color: var(--cp-warning); color: var(--cp-text); background: color-mix(in srgb, var(--cp-warning) 18%, transparent); }
+    .tag.dep { border-style: dashed; }
+    .tag.o { border-color: var(--cp-accent); color: var(--cp-accent); }
+    .card.col-waiting { border-left: 3px solid var(--cp-warning); }
+    .card.col-review { border-left: 3px solid var(--cp-link); }
+    .card.col-done { border-left: 3px solid var(--cp-success); opacity: .8; }
+    .card.col-progress { border-left: 3px solid var(--cp-accent); }
+    .card.notready {
+      border-style: dashed; color: var(--cp-text-muted); box-shadow: none;
+      background: repeating-linear-gradient(135deg, var(--cp-surface), var(--cp-surface) 6px, var(--cp-surface-soft) 6px, var(--cp-surface-soft) 12px);
+    }
+    .card.ready { border-left: 3px solid var(--cp-text-soft); }
+    body.filtering .card.dim, body.filtering .lane.dim > .lh { opacity: .25; }
+    body.filtering .card.hit { outline: 2px solid var(--cp-accent); }
+    body.hide-notready .card.notready, body.hide-done .card.col-done { display: none; }
+    button.ghost.on { border-color: var(--cp-accent); background: var(--cp-accent-soft); color: var(--cp-text); }
+    .legend { color: var(--cp-text-muted); font-size: 11px; margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="titlebar">
+      <h1 id="title"></h1>
+      <button class="ghost" id="expand">Expand all</button>
+      <button class="ghost" id="collapse">Collapse all</button>
+      <button class="ghost" id="theme">Theme</button>
+      <button class="ghost" data-hide="notready">Hide Not Ready</button>
+      <button class="ghost" data-hide="done">Hide Done</button>
+      <span class="meta" id="meta"></span>
+    </div>
+    <div class="outcomes" id="outcomes"></div>
+    <div class="legend">
+      <span>Outcome: green ≥ rubric minimum · yellow within 0.25 below · red lower · hollow = never graded. Click to highlight its tasks.</span>
+      <span>To Do: solid = ready · hatched = waiting on dependencies</span>
+    </div>
+  </header>
+  <div class="colheads" id="colheads"></div>
+  <main id="board"></main>
+  <script id="payload" type="application/json">__PAYLOAD__</script>
+  <script>
+    let M = JSON.parse(document.getElementById("payload").textContent);
+    let activeFilter = null;
+    const KEY = "statusBoard.collapsed." + M.workspace;
+    const collapsed = new Set(JSON.parse(localStorage.getItem(KEY) || "[]"));
+    const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+    let oShort = {};
+    const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+    function renderAll() {
+    oShort = Object.fromEntries(M.outcomes.map(o => [o.id, o.short]));
+    document.getElementById("title").textContent =
+      M.project ? `${M.project.dx} ${M.project.title}` : M.workspace;
+    document.getElementById("meta").textContent =
+      `${M.taskCount} tasks · read ${new Date(M.generatedAt).toLocaleString()}`;
+
+    const oc = document.getElementById("outcomes");
+    oc.replaceChildren();
+    for (const o of M.outcomes) {
+      const c = el("div", `chip ${o.color}`);
+      const tip = [o.title, "", o.description, "",
+        o.score == null ? "Never graded" :
+          `Latest grade ${o.score.toFixed(2)} (min ${o.minimum ?? "?"}) by ${o.grader} at ${o.gradedAt}`,
+        `Outcome status: ${o.status}`].join("\n");
+      c.title = tip;
+      c.dataset.id = o.id;
+      c.innerHTML = `<span class="dot"></span><b>${esc(o.short)}</b><span class="t">${esc(o.title)}</span>`;
+      c.onclick = () => setFilter(c.classList.contains("active") ? null : o.id);
+      oc.appendChild(c);
+    }
+
+    const ch = document.getElementById("colheads");
+    ch.replaceChildren();
+    for (const c of M.columns) ch.appendChild(el("div", null, esc(c.label)));
+
+    const board = document.getElementById("board");
+    board.replaceChildren();
+    if (M.root.cards.length) board.appendChild(laneEl({...M.root, title: "Top-level tasks", id: "__top__", lanes: []}));
+    M.root.lanes.forEach(l => board.appendChild(laneEl(l)));
+    if (activeFilter && !M.outcomes.some(o => o.id === activeFilter)) activeFilter = null;
+    setFilter(activeFilter);
+    }
+
+    function cardEl(c) {
+      const cls = ["card", `col-${c.column}`];
+      if (c.column === "todo") cls.push(c.notReady ? "notready" : "ready");
+      const e = el("div", cls.join(" "));
+      e.dataset.outcomes = c.outcomes.join(" ");
+      const tags = [];
+      if (c.reason) tags.push(`<span class="tag reason">${esc(c.reason)}</span>`);
+      if (c.unmet.length) tags.push(`<span class="tag dep" title="Unmet dependencies">waits on ${esc(c.unmet.join(", "))}</span>`);
+      for (const o of c.outcomes) tags.push(`<span class="tag o">${esc(oShort[o])}</span>`);
+      for (const l of c.labels) tags.push(`<span class="tag">${esc(l)}</span>`);
+      e.title = `${c.dx} ${c.title}\nstatus: ${c.status}`;
+      e.innerHTML = `<div class="top"><span class="dx">${esc(c.dx)}</span><span class="ttl">${esc(c.title)}</span></div>` +
+        (tags.length ? `<div class="tags">${tags.join("")}</div>` : "");
+      return e;
+    }
+
+    function laneEl(l) {
+      const e = el("div", "lane" + (collapsed.has(l.id) ? " collapsed" : ""));
+      e.dataset.id = l.id;
+      e.dataset.outcomes = l.outcomes.join(" ");
+      const counts = M.columns.map(c =>
+        `<i class="${l.counts[c.key] ? "" : "z"}" title="${esc(c.label)}">${l.counts[c.key]}</i>`).join("");
+      const h = el("div", "lh",
+        `<span class="caret">▾</span><span class="dx">${esc(l.dx)}</span><span class="ttl">${esc(l.title)}</span>` +
+        (l.status ? `<span class="st">${esc(l.status)}</span>` : "") + `<span class="counts">${counts}</span>`);
+      h.onclick = () => {
+        e.classList.toggle("collapsed");
+        e.classList.contains("collapsed") ? collapsed.add(l.id) : collapsed.delete(l.id);
+        localStorage.setItem(KEY, JSON.stringify([...collapsed]));
+      };
+      const body = el("div", "body");
+      if (l.cards.length) {
+        const row = el("div", "row");
+        for (const c of M.columns) {
+          const cell = el("div", "cell");
+          l.cards.filter(x => x.column === c.key).forEach(x => cell.appendChild(cardEl(x)));
+          row.appendChild(cell);
+        }
+        body.appendChild(row);
+      }
+      l.lanes.forEach(s => body.appendChild(laneEl(s)));
+      e.append(h, body);
+      return e;
+    }
+
+    function setFilter(oid) {
+      activeFilter = oid;
+      document.querySelectorAll(".chip").forEach(c => c.classList.toggle("active", c.dataset.id === oid));
+      document.body.classList.toggle("filtering", !!oid);
+      document.querySelectorAll(".card, .lane").forEach(e => {
+        const hit = !!oid && e.dataset.outcomes.split(" ").includes(oid);
+        e.classList.toggle("hit", hit && e.classList.contains("card"));
+        e.classList.toggle("dim", !!oid && !hit);
+      });
+    }
+
+    const setAll = c => {
+      document.querySelectorAll(".lane").forEach(e => {
+        e.classList.toggle("collapsed", c);
+        c ? collapsed.add(e.dataset.id) : collapsed.delete(e.dataset.id);
+      });
+      localStorage.setItem(KEY, JSON.stringify([...collapsed]));
+    };
+    document.getElementById("expand").onclick = () => setAll(false);
+    document.getElementById("collapse").onclick = () => setAll(true);
+    document.getElementById("theme").onclick = () => {
+      const r = document.documentElement;
+      r.setAttribute("data-theme", r.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    };
+
+    const HKEY = "statusBoard.hide." + M.workspace;
+    const hidden = new Set(JSON.parse(localStorage.getItem(HKEY) || "[]"));
+    document.querySelectorAll("button[data-hide]").forEach(b => {
+      const k = b.dataset.hide;
+      const apply = () => {
+        document.body.classList.toggle("hide-" + k, hidden.has(k));
+        b.classList.toggle("on", hidden.has(k));
+      };
+      b.onclick = () => {
+        hidden.has(k) ? hidden.delete(k) : hidden.add(k);
+        localStorage.setItem(HKEY, JSON.stringify([...hidden]));
+        apply();
+      };
+      apply();
+    });
+
+    renderAll();
+    // Auto-refresh every 30s (live server only). Re-renders in place: collapse state
+    // (localStorage), outcome filter and scroll position are preserved.
+    if (location.protocol.startsWith("http")) {
+      let last = JSON.stringify({...M, generatedAt: null});
+      setInterval(async () => {
+        try {
+          const r = await fetch("data.json", {cache: "no-store"});
+          if (!r.ok) return;
+          const next = await r.json();
+          const sig = JSON.stringify({...next, generatedAt: null});
+          M = next;
+          if (sig === last) {
+            document.getElementById("meta").textContent =
+              `${M.taskCount} tasks · read ${new Date(M.generatedAt).toLocaleString()}`;
+            return;
+          }
+          last = sig;
+          const y = window.scrollY;
+          renderAll();
+          window.scrollTo(0, y);
+        } catch (_) { /* server down; keep last view */ }
+      }, 30000);
+    }
+  </script>
+</body>
+</html>
