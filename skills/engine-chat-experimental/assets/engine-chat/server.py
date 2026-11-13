@@ -21,7 +21,7 @@ from urllib.parse import unquote, urlparse
 SERVICE_ID = "engine-chat"
 ENGINE_CHAT_VERSION = "0.1.0-experimental"
 PROTOCOL_VERSION = "1"
-TESTED_DISCOVERY_VERSION = "0.15.19"
+TESTED_DISCOVERY_VERSION = "0.15.21"
 TESTED_OS = "macOS"
 LOOPBACK_HOST = "127.0.0.1"
 TERMINAL_STATES = {"cancelled", "completed", "failed", "stopped"}
@@ -2040,7 +2040,7 @@ class TerminationRequested(Exception):
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
-            "Serve Engine Chat 0.1.0-experimental on loopback. Tested with Discovery 0.15.19 "
+            "Serve Engine Chat 0.1.0-experimental on loopback. Tested with Discovery 0.15.21 "
             "on macOS; other versions and platforms are untested."
         )
     )

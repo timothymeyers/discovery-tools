@@ -4,12 +4,12 @@
   "packageVersion": "0.1.0-experimental",
   "protocolVersion": "1",
   "testedCompatibility": {
-    "discoveryVersion": "0.15.19",
+    "discoveryVersion": "0.15.21",
     "operatingSystem": "macOS",
-    "statement": "Tested with Discovery 0.15.19 on macOS; other versions and platforms are untested."
+    "statement": "Tested with Discovery 0.15.21 on macOS; other versions and platforms are untested."
   },
   "payloadHashes": {
-    "index.html": "8f30e5293643c22870f9391e6a901a07f767bf38b44dbf1c5cba7afa72dd411a",
-    "server.py": "7384396e6c31f78a6b8361cb015f780838df6e400aab6d1c62186b2686c44556"
+    "index.html": "6e2912be3a768d84f60e8bd0ba615a9a158c30c3cc3753bf58a37a362bb54e42",
+    "server.py": "ab060539accb228a06a96bb32e5f4094d87bc37031e6e56cfe71d301fb6012f2"
   }
 }

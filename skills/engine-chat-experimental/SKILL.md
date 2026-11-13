@@ -17,7 +17,7 @@ metadata:
 # Engine Chat Experimental
 
 Use this skill to install or launch **Engine Chat 0.1.0-experimental** in a
-Discovery project. It was tested with **Discovery 0.15.19 on macOS**. Other
+Discovery project. It was tested with **Discovery 0.15.21 on macOS**. Other
 Discovery versions and operating systems are untested; do not make support or
 compatibility claims for them.
 

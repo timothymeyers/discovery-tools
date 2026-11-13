@@ -1000,7 +1000,7 @@ class EngineChatServerTests(unittest.TestCase):
         self.assertEqual("engine-chat", payload["serviceId"])
         self.assertEqual("0.1.0-experimental", payload["engineChatVersion"])
         self.assertEqual("1", payload["protocolVersion"])
-        self.assertEqual("0.15.19", payload["testedDiscoveryVersion"])
+        self.assertEqual("0.15.21", payload["testedDiscoveryVersion"])
         self.assertEqual("macOS", payload["testedOperatingSystem"])
         self.assertEqual(server.workspace_fingerprint(self.workspace), payload["workspaceFingerprint"])
         self.assertEqual(os.getpid(), payload["pid"])
