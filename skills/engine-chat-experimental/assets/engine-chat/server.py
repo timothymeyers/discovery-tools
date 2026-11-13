@@ -34,7 +34,30 @@ SOURCE_REF_RE = re.compile(r"\s*\[source:\s*[^\]]+\]", re.IGNORECASE)
 TASK_ID_RE = re.compile(r"DX-\d+", re.IGNORECASE)
 TOOL_FAILURE_RE = re.compile(r"Tool call failed:\s*(.*?)\s+-\s+", re.DOTALL)
 FRACTION_RE = re.compile(r"^(?P<head>.*?\.)(?P<fraction>\d+)(?P<zone>Z|[+-]\d{2}:\d{2})?$")
-STEERING_RE = re.compile(r"^Communication queued on steering:[^:]+:\s*(.*)$", re.DOTALL | re.IGNORECASE)
+STEERING_RE = re.compile(
+    r"^Communication (?P<delivery>queued|applied) on steering:[^:]+:\s*(?P<message>.*)$",
+    re.DOTALL | re.IGNORECASE,
+)
+STEERING_INTERRUPT_RE = re.compile(r"^Turn interrupted by steering message\b", re.IGNORECASE)
+USER_REQUEST_RE = re.compile(
+    r"\b(?:waiting\s+(?:for|on)|awaiting|pending|needs?|requires?|ready\s+for)\s+"
+    r"(?:your|human|user)\s+(?:final\s+)?"
+    r"(?P<kind>approval|review|input|decision|confirmation|response|feedback)\b",
+    re.IGNORECASE,
+)
+NON_CURRENT_REQUEST_RE = re.compile(
+    r"\b(?:not|no|never|without|already|previously|earlier|was|were|had|"
+    r"if|when|once|after|example|quoted|says?|said|mentions?|"
+    r"don't|doesn't|isn't|aren't|wasn't|weren't)\b",
+    re.IGNORECASE,
+)
+RESOLVED_REQUEST_RE = re.compile(
+    r"\b(?:approval|review|input|decision|confirmation|response|feedback)\s+"
+    r"(?:(?:has been|is|was)\s+)?(?:received|granted|provided|completed|resolved)\b|"
+    r"\bno\s+(?:further\s+)?(?:action|approval|review|input)\s+(?:is\s+)?(?:needed|required)\b|"
+    r"\bno longer\s+(?:waiting|awaiting|needed|required)\b",
+    re.IGNORECASE,
+)
 SECURITY_HEADERS = {
     "Content-Security-Policy": (
         "default-src 'self'; script-src 'self' 'unsafe-inline'; "
@@ -136,11 +159,22 @@ def extract_starting_prompt(value: Any, workspace: Path) -> Optional[str]:
 
 
 def extract_steering_message(value: Any, workspace: Path) -> Optional[str]:
-    match = STEERING_RE.match(str(value or ""))
+    match = STEERING_RE.match(str(value or "").strip())
     if not match:
         return None
-    message = clean_narrative(match.group(1), workspace, limit=12000)
+    message = clean_narrative(match.group("message"), workspace, limit=12000)
     return message or None
+
+
+def is_steering_boundary(event: Dict[str, Any]) -> bool:
+    if event.get("kind") != "Progress":
+        return False
+    content = str(event.get("content") or "").strip()
+    match = STEERING_RE.match(content)
+    return bool(
+        (match and match.group("delivery").lower() == "applied")
+        or STEERING_INTERRUPT_RE.match(content)
+    )
 
 
 def coalesce_streaming_text_events(events: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -152,7 +186,7 @@ def coalesce_streaming_text_events(events: List[Dict[str, Any]]) -> List[Dict[st
         kind = str(event.get("kind", ""))
         if kind not in {"Thinking", "Observation"}:
             result.append(event)
-            if kind == "Done":
+            if kind == "Done" or is_steering_boundary(event):
                 active.clear()
             continue
 
@@ -403,7 +437,7 @@ def state_label(state: Any) -> str:
     labels = {
         "running": "Working",
         "sleeping": "Sleeping",
-        "idle": "Waiting",
+        "idle": "Idle",
         "paused": "Paused",
         "completed": "Complete",
         "failed": "Needs attention",
@@ -790,6 +824,10 @@ def action_profile(
         "operation": operation,
         "targetStatus": target_status,
         "agentRole": agent_role,
+        # Structured task references only; task names mentioned in a prompt
+        # or progress note must not widen the live approval scope.
+        "taskRefs": [str(raw_input["taskId"])]
+        if operation in {"launch", "transition", "progress"} and raw_input.get("taskId") else [],
     }
 
 
@@ -797,6 +835,8 @@ def combined_status(entries: List[Dict[str, Any]]) -> str:
     statuses = [str(entry.get("status", "")) for entry in entries]
     if "pending" in statuses:
         return "pending"
+    if "interrupted" in statuses:
+        return "interrupted"
     if "completed" in statuses:
         return "completed"
     if "followup" in statuses:
@@ -1024,7 +1064,29 @@ def thought_block(value: str, workspace: Path) -> Optional[Dict[str, Optional[st
     return {"summary": summary, "detail": detail}
 
 
-def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Optional[str]]]:
+def explicit_user_request(value: str, workspace: Path) -> Optional[Dict[str, str]]:
+    """Recognize direct handoff language, not generic waiting or mentions of approval.
+
+    This is an indication from an observation, not an authoritative approval queue.
+    Quoted examples, code, historical requests, and negated requests are excluded.
+    """
+    text = re.sub(r"```.*?```", "", str(value or ""), flags=re.DOTALL)
+    text = re.sub(r"`[^`\n]*`", "", text)
+    text = re.sub(r"(?m)^\s*>.*$", "", text)
+    text = re.sub(r'"[^"\n]*"|“[^”\n]*”|(?<!\w)\x27[^\x27\n]+\x27(?!\w)', "", text)
+    text = clean_narrative(text, workspace, limit=12000)
+    request = None
+    for sentence in re.split(r"(?<=[.!?])\s+|\n+", text):
+        if RESOLVED_REQUEST_RE.search(sentence):
+            request = None
+            continue
+        match = USER_REQUEST_RE.search(sentence)
+        if match and not NON_CURRENT_REQUEST_RE.search(sentence.replace("’", "'")):
+            request = {"kind": match.group("kind").lower(), "excerpt": clean_inline(sentence, 320)}
+    return request
+
+
+def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Any]]:
     text = clean_narrative(value, workspace)
     if not text:
         return None
@@ -1045,13 +1107,58 @@ def observation_block(value: str, workspace: Path) -> Optional[Dict[str, Optiona
         return {"summary": summary, "detail": None}
     summary = summarize_narrative(text)
     detail = text if summary != text else None
-    return {"summary": summary, "detail": detail}
+    return {"summary": summary, "detail": detail, "userRequest": explicit_user_request(value, workspace)}
 
 
-def turn_intro(number: int, timeline: List[Dict[str, Any]]) -> str:
+def user_action_attention(
+    state: str, turns: List[Dict[str, Any]], pending_messages: List[Dict[str, Any]]
+) -> Optional[Dict[str, Any]]:
+    """Surface a completed turn's final request without changing engine lifecycle."""
+    if state.lower() not in {"idle", "paused"} or not turns or pending_messages:
+        return None
+    latest = turns[-1]
+    if (
+        not latest.get("endedAt") or latest.get("endReason") == "steering"
+        or latest.get("pendingActionCount") or latest.get("failedActionCount")
+    ):
+        return None
+    sleep = latest.get("sleep") or {}
+    until = parse_time(sleep.get("until"))
+    if sleep.get("status") == "pending" or (
+        sleep.get("status") == "scheduled" and (until is None or until > datetime.now(timezone.utc))
+    ):
+        return None
+    timeline = [entry for entry in latest.get("timeline", []) if entry.get("type") != "sleep"]
+    observation = timeline[-1] if timeline else {}
+    request = observation.get("userRequest")
+    if observation.get("type") != "observation" or not request:
+        return None
+    kind = request["kind"]
+    return {
+        "kind": kind,
+        "label": "Needs your action",
+        "title": "Ready for your review" if kind == "review" else "Waiting for your {}".format(kind),
+        "description": (
+            "This turn is finished. Review the results, then approve or request changes in Discovery."
+            if kind in {"approval", "review"}
+            else "This turn is finished. Read the latest update and provide the requested input in Discovery."
+        ),
+        "excerpt": request["excerpt"],
+        "source": "Latest observation",
+        "turnId": latest["id"],
+        "entryId": observation["id"],
+        "requestedAt": observation.get("startedAt"),
+    }
+
+
+def turn_intro(number: int, timeline: List[Dict[str, Any]], after_steering: bool = False) -> str:
+    first_action = next(iter_actions(timeline), None)
+    if after_steering:
+        if first_action and first_action.get("intent") == "context":
+            return "Gathering context after your steering message."
+        return "Continuing with your steering message."
     if number == 1:
         return "Waking up. Getting the lay of the land."
-    first_action = next(iter_actions(timeline), None)
     first_summary = str(first_action.get("summary", "")).lower() if first_action else ""
     if any(word in first_summary for word in ("validat", "evaluat", "audit", "checking results")):
         return "Back awake. Checking how things landed."
@@ -1086,6 +1193,11 @@ class EngineRunParser:
                     "number": number,
                     "startedAt": timestamp,
                     "endedAt": None,
+                    "endReason": None,
+                    "startReason": "steering" if (
+                        any(message.get("delivery") == "applied" for message in pending_steering)
+                        or (turns and turns[-1].get("endReason") == "steering")
+                    ) else None,
                     "timeline": [],
                     "sleep": None,
                     "queuedMessagesBefore": pending_steering,
@@ -1127,6 +1239,7 @@ class EngineRunParser:
                             "summary": block["summary"],
                             "detail": block["detail"],
                             "detailLabel": "Observation",
+                            "userRequest": block.get("userRequest"),
                             "startedAt": text_timestamp,
                         }
                     )
@@ -1143,6 +1256,35 @@ class EngineRunParser:
                 if queue and (pending_key in key or key in pending_key):
                     return queue.popleft()
             return None
+
+        def interrupt_turn(timestamp: Optional[str], sequence: Any) -> None:
+            nonlocal current, pending
+            # The applied message and the restart notice describe one boundary.
+            # Neither should create an empty turn while awaiting the next event.
+            if current is None:
+                return
+            for action in iter_actions(current["timeline"]):
+                if action.get("status") == "pending":
+                    action["status"] = "interrupted"
+                    action["finishedAt"] = timestamp
+            sleep = current.get("sleep")
+            if sleep is not None:
+                if sleep.get("status") in {"pending", "scheduled"}:
+                    sleep["status"] = "interrupted"
+                if sleep not in current["timeline"]:
+                    current["timeline"].append(sleep)
+            current["timeline"].append(
+                {
+                    "id": "steering-received-{}".format(sequence),
+                    "type": "steering",
+                    "summary": "Received steering message",
+                    "startedAt": timestamp,
+                }
+            )
+            current["endedAt"] = timestamp
+            current["endReason"] = "steering"
+            current = None
+            pending = defaultdict(deque)
 
         if output_path.exists():
             parsed_events: List[Dict[str, Any]] = []
@@ -1179,15 +1321,37 @@ class EngineRunParser:
                 flush_text()
 
                 if kind == "Progress":
-                    steering_text = extract_steering_message(event.get("content", ""), self.workspace)
-                    if steering_text:
-                        pending_steering.append(
-                            {
-                                "id": "steering-{}".format(event.get("sequence", len(pending_steering) + 1)),
-                                "text": steering_text,
-                                "queuedAt": timestamp,
-                            }
-                        )
+                    content = str(event.get("content") or "").strip()
+                    steering = STEERING_RE.match(content)
+                    if steering:
+                        delivery = steering.group("delivery").lower()
+                        steering_text = extract_steering_message(content, self.workspace)
+                        if steering_text:
+                            # A queued message may later be applied. Update its
+                            # bubble instead of showing the same message twice.
+                            queued = next(
+                                (message for message in pending_steering
+                                 if message.get("delivery") == "queued" and message["text"] == steering_text),
+                                None,
+                            ) if delivery == "applied" else None
+                            if queued is not None:
+                                queued["delivery"] = "applied"
+                                queued["receivedAt"] = timestamp
+                            else:
+                                pending_steering.append(
+                                    {
+                                        "id": "steering-{}".format(event.get("sequence", len(pending_steering) + 1)),
+                                        "text": steering_text,
+                                        "queuedAt": timestamp,
+                                        "receivedAt": timestamp if delivery == "applied" else None,
+                                        "delivery": delivery,
+                                    }
+                                )
+                        if delivery == "applied":
+                            interrupt_turn(timestamp, event.get("sequence"))
+                        continue
+                    if STEERING_INTERRUPT_RE.match(content):
+                        interrupt_turn(timestamp, event.get("sequence"))
                         continue
 
                 if kind == "Done":
@@ -1198,6 +1362,11 @@ class EngineRunParser:
                             current["timeline"].append(sleep)
                     current = None
                     pending = defaultdict(deque)
+                    continue
+
+                # Late tool acknowledgements from a cancelled turn must not
+                # consume the steering bubble or manufacture a new empty turn.
+                if kind == "ActionApplied" and current is None:
                     continue
 
                 turn = ensure_turn(timestamp)
@@ -1365,8 +1534,10 @@ class EngineRunParser:
             label_read_revisits(turn["timeline"])
             turn["timeline"] = roll_up_context(turn["timeline"])
             actions = list(iter_actions(turn["timeline"]))
-            turn["intro"] = turn_intro(turn["number"], turn["timeline"])
+            turn["intro"] = turn_intro(turn["number"], turn["timeline"], turn["startReason"] == "steering")
             turn["summary"] = concise_turn_summary(turn["timeline"])
+            if turn["endReason"] == "steering" and turn["summary"] == "Turn complete":
+                turn["summary"] = "Received steering message"
             turn["actionCount"] = sum(int(action.get("mergedCount", 1)) for action in actions)
             turn["completedActionCount"] = sum(
                 int(action.get("mergedCount", 1))
@@ -1380,6 +1551,7 @@ class EngineRunParser:
         state = str(meta.get("state", "Unknown"))
         all_actions = [action for turn in turns for action in iter_actions(turn["timeline"])]
         all_action_count = sum(int(action.get("mergedCount", 1)) for action in all_actions)
+        all_steering = [message for turn in turns for message in turn["queuedMessagesBefore"]] + pending_steering
         updated_at = last_timestamp or meta.get("completedAt") or meta.get("startedAt")
         run = {
             "definitionId": str(meta.get("definitionId") or run_dir.parent.name),
@@ -1407,8 +1579,8 @@ class EngineRunParser:
                     if action["status"] == "completed"
                 ),
                 "failedActions": sum(1 for action in all_actions if action["status"] == "failed"),
-                "queuedMessages": sum(len(turn.get("queuedMessagesBefore", [])) for turn in turns)
-                + len(pending_steering),
+                "queuedMessages": sum(1 for message in all_steering if message["delivery"] == "queued"),
+                "steeringMessages": len(all_steering),
                 "malformedLinesIgnored": malformed_lines,
             },
             "turns": turns,
@@ -1473,7 +1645,7 @@ class EngineRunRepository:
             with path.open("r", encoding="utf-8") as stream:
                 value = json.load(stream)
             return value if isinstance(value, dict) else None
-        except (OSError, json.JSONDecodeError):
+        except (OSError, UnicodeError, json.JSONDecodeError):
             return None
 
     def _task_lookup(self) -> Dict[str, Dict[str, Any]]:
@@ -1489,6 +1661,83 @@ class EngineRunRepository:
                 if key:
                     lookup[str(key)] = task
         return lookup
+
+    def _current_attention(self, parsed: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        attention = user_action_attention(parsed["run"]["state"], parsed["turns"], parsed["queuedMessages"])
+        if not attention or attention["kind"] not in {"approval", "review"}:
+            return attention
+
+        # The final request may name a subtree. Otherwise use tasks the run
+        # actually changed or delegated, never every ready task in the project.
+        references = collect_task_ids(attention["excerpt"]) or list({
+            reference
+            for turn in parsed["turns"] for action in iter_actions(turn["timeline"])
+            if action.get("status") == "completed"
+            for reference in action.get("taskRefs", [])
+        })
+        if not references:
+            # A general request (e.g. review a design) has no task-board truth.
+            # Keep its provenance explicit rather than inventing a task count.
+            return attention
+
+        lookup = {key.lower(): task for key, task in self._task_lookup().items()}
+        tasks = {str(task["taskId"]): task for task in lookup.values() if task.get("taskId")}
+        children: Dict[str, List[str]] = defaultdict(list)
+        for task_id, task in tasks.items():
+            parent = lookup.get(str(task.get("parentId", "")).lower(), {})
+            if parent.get("taskId"):
+                children[str(parent["taskId"])].append(task_id)
+        pending = [str(lookup[ref.lower()]["taskId"]) for ref in references
+                   if lookup.get(ref.lower(), {}).get("taskId")]
+        scoped: set[str] = set()
+        while pending:
+            task_id = pending.pop()
+            if task_id in scoped:
+                continue
+            scoped.add(task_id)
+            pending.extend(children.get(task_id, []))
+        ready = sorted(
+            (tasks[task_id] for task_id in scoped
+             if str(tasks[task_id].get("status", "")).lower() in {"executiondone", "flaggedhuman"}),
+            key=lambda task: str(task.get("dxId") or task["taskId"]),
+        )
+        # Missing/unreadable task data is unknown, not evidence that an old
+        # approval request is still open. Resolved requests disappear here too.
+        if not ready:
+            return None
+        current_tasks = [
+            {
+                "id": str(task.get("dxId") or task["taskId"]),
+                "title": clean_inline(task.get("title"), 140),
+                "status": str(task["status"]),
+            }
+            for task in ready
+        ]
+        count = len(current_tasks)
+        excerpt = "\n".join("{} — {}".format(task["id"], task["title"]) for task in current_tasks[:3])
+        if count > 3:
+            excerpt += "\n+ {} more".format(count - 3)
+        return {
+            **attention,
+            "title": "1 task needs your review" if count == 1 else "{} tasks need your review".format(count),
+            "description": "This turn is finished. Review the current tasks in Discovery, then approve or request changes.",
+            "excerpt": excerpt,
+            "source": "Current task board",
+            "tasks": current_tasks,
+        }
+
+    def _present_run(self, parsed: Dict[str, Any], signature: Tuple[int, int, int, int]) -> Dict[str, Any]:
+        """Refresh handoffs even when only task state or a sleep deadline changed."""
+        run = parsed["run"]
+        attention = self._current_attention(parsed)
+        live = is_live_state(run.get("state"), run.get("updatedAt"))
+        revision = hashlib.sha256(json.dumps([attention, live], sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        # Return a snapshot; concurrent responses must not mutate cached data.
+        return {
+            **parsed,
+            "run": {**run, "attention": attention, "isLive": live,
+                    "version": "{}-{}".format("-".join(map(str, signature)), revision)},
+        }
 
     def list_active_agents(self) -> Dict[str, Any]:
         agents: List[Dict[str, Any]] = []
@@ -1605,16 +1854,13 @@ class EngineRunRepository:
         with self._lock:
             cached = self._cache.get(key)
             if cached and cached[0] == signature:
-                cached[1]["run"]["isLive"] = is_live_state(
-                    cached[1]["run"].get("state"), cached[1]["run"].get("updatedAt")
-                )
-                return cached[1]
+                return self._present_run(cached[1], signature)
             meta = self._read_meta(run_dir)
             if not meta:
                 return None
             parsed = self.parser.parse(run_dir, meta, signature)
             self._cache[key] = (signature, parsed)
-            return parsed
+            return self._present_run(parsed, signature)
 
 
 class EngineChatHTTPServer(ThreadingHTTPServer):

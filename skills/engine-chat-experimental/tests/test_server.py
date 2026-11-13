@@ -5,6 +5,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 from urllib.request import urlopen
 
 
@@ -376,6 +377,182 @@ class EngineRunParserTests(unittest.TestCase):
         self.assertEqual("Recheck the approved definitions.", payload["queuedMessages"][0]["text"])
         self.assertEqual(1, payload["stats"]["queuedMessages"])
 
+    def test_applied_steering_ends_turn_and_puts_message_before_new_context(self):
+        title = "discovery-app-sdk-discovery-tasks-get"
+        message = "Did you actually assign and start agents to run the leaf tasks?\nPlease delegate the work."
+        self.write_events([
+            event("Thinking", "Reviewing meeting notes.", 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication applied on steering:text: " + message, 2, "2026-10-24T10:00:02+00:00"),
+            event("Progress", "Turn interrupted by steering message — restarting.", 3, "2026-10-24T10:00:02.1+00:00"),
+            proposed(title, {"taskId": "DX-74"}, 4, "2026-10-24T10:00:03+00:00"),
+            applied(title, {"status": "completed"}, 5, "2026-10-24T10:00:03.1+00:00"),
+            proposed(title, {"taskId": "DX-75"}, 6, "2026-10-24T10:00:04+00:00"),
+            applied(title, {"status": "completed"}, 7, "2026-10-24T10:00:04.1+00:00"),
+            event("Done", "Stop reason: end_turn", 8, "2026-10-24T10:00:05+00:00"),
+        ])
+
+        payload = self.parse()
+
+        self.assertEqual(2, len(payload["turns"]))
+        first, second = payload["turns"]
+        self.assertEqual("steering", first["endReason"])
+        self.assertEqual("2026-10-24T10:00:02+00:00", first["endedAt"])
+        self.assertEqual(["thinking", "steering"], [entry["type"] for entry in first["timeline"]])
+        self.assertEqual("Received steering message", first["timeline"][-1]["summary"])
+        self.assertEqual("steering", second["startReason"])
+        self.assertEqual("2026-10-24T10:00:03+00:00", second["startedAt"])
+        self.assertEqual("Gathering context after your steering message.", second["intro"])
+        self.assertEqual("group", second["timeline"][0]["type"])
+        self.assertEqual("Gathering context on DX-74", second["timeline"][0]["summary"])
+        self.assertEqual(1, len(second["queuedMessagesBefore"]))
+        self.assertEqual(message, second["queuedMessagesBefore"][0]["text"])
+        self.assertEqual("applied", second["queuedMessagesBefore"][0]["delivery"])
+        self.assertEqual(2, payload["stats"]["actions"])
+        self.assertEqual(0, payload["stats"]["queuedMessages"])
+        self.assertEqual(1, payload["stats"]["steeringMessages"])
+        self.assertNotIn("Communication applied", json.dumps(payload))
+        self.assertNotIn("Turn interrupted by steering", json.dumps(payload))
+
+    def test_steering_does_not_stitch_text_across_interruption(self):
+        for kind in ("Thinking", "Observation"):
+            with self.subTest(kind=kind):
+                self.write_events([
+                    event(kind, "Before steering.", 1, "2026-10-24T10:00:01+00:00"),
+                    event("Progress", "Communication applied on steering:text: Change focus.", 2, "2026-10-24T10:00:01.1+00:00"),
+                    event("Progress", "Turn interrupted by steering message — restarting.", 3, "2026-10-24T10:00:01.2+00:00"),
+                    event(kind, "After steering.", 4, "2026-10-24T10:00:01.3+00:00"),
+                ])
+
+                payload = self.parse()
+
+                self.assertEqual(2, len(payload["turns"]))
+                self.assertEqual("Before steering.", payload["turns"][0]["timeline"][0]["summary"])
+                self.assertEqual("After steering.", payload["turns"][1]["timeline"][0]["summary"])
+
+    def test_applied_steering_without_next_activity_stays_after_closed_turn(self):
+        events = [
+            event("Thinking", "Working.", 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication applied on steering:text: Delegate now.", 2, "2026-10-24T10:00:02+00:00"),
+        ]
+        self.write_events(events)
+        initial = self.parse()
+        events.append(event("Progress", "Turn interrupted by steering message — restarting.", 3, "2026-10-24T10:00:02.1+00:00"))
+        self.write_events(events)
+        updated = self.parse()
+
+        self.assertEqual(1, len(updated["turns"]))
+        self.assertEqual("steering", updated["turns"][0]["endReason"])
+        self.assertEqual(initial["turns"], updated["turns"])
+        self.assertEqual(initial["queuedMessages"], updated["queuedMessages"])
+        self.assertEqual("Delegate now.", updated["queuedMessages"][0]["text"])
+        self.assertEqual("applied", updated["queuedMessages"][0]["delivery"])
+        self.assertEqual(0, updated["stats"]["queuedMessages"])
+
+    def test_queued_then_applied_steering_has_only_one_message(self):
+        self.write_events([
+            event("Thinking", "Current work.", 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication queued on steering:text: Recheck the definitions.", 2, "2026-10-24T10:00:02+00:00"),
+            event("Progress", "Communication applied on steering:text: Recheck the definitions.", 3, "2026-10-24T10:00:03+00:00"),
+            event("Thinking", "Checking now.", 4, "2026-10-24T10:00:04+00:00"),
+        ])
+
+        payload = self.parse()
+        messages = payload["turns"][1]["queuedMessagesBefore"]
+
+        self.assertEqual(1, len(messages))
+        self.assertEqual("steering-2", messages[0]["id"])
+        self.assertEqual("2026-10-24T10:00:02+00:00", messages[0]["queuedAt"])
+        self.assertEqual("2026-10-24T10:00:03+00:00", messages[0]["receivedAt"])
+        self.assertEqual("applied", messages[0]["delivery"])
+        self.assertEqual(1, payload["stats"]["steeringMessages"])
+        self.assertEqual(0, payload["stats"]["queuedMessages"])
+
+    def test_restart_done_and_late_tool_result_do_not_create_empty_turn(self):
+        title = "discovery-app-sdk-discovery-tasks-get"
+        self.write_events([
+            proposed(title, {"taskId": "DX-74"}, 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication applied on steering:text: Change focus.", 2, "2026-10-24T10:00:02+00:00"),
+            applied(title, {"status": "completed"}, 3, "2026-10-24T10:00:02.1+00:00"),
+            event("Progress", "Turn interrupted by steering message — restarting.", 4, "2026-10-24T10:00:02.2+00:00"),
+            event("Done", "Stop reason: cancelled", 5, "2026-10-24T10:00:02.3+00:00"),
+            proposed(title, {"taskId": "DX-75"}, 6, "2026-10-24T10:00:03+00:00"),
+        ])
+
+        payload = self.parse()
+
+        self.assertEqual(2, len(payload["turns"]))
+        first, second = payload["turns"]
+        self.assertEqual("interrupted", first["timeline"][0]["status"])
+        self.assertEqual(0, first["pendingActionCount"])
+        self.assertEqual(0, first["completedActionCount"])
+        self.assertEqual("2026-10-24T10:00:03+00:00", second["startedAt"])
+        self.assertEqual("pending", second["timeline"][0]["status"])
+        self.assertEqual("Change focus.", second["queuedMessagesBefore"][0]["text"])
+
+    def test_interruption_notice_can_precede_applied_message_or_stand_alone(self):
+        for include_applied in (False, True):
+            with self.subTest(include_applied=include_applied):
+                events = [
+                    event("Thinking", "Before steering.", 1, "2026-10-24T10:00:01+00:00"),
+                    event("Progress", "Turn interrupted by steering message — restarting.", 2, "2026-10-24T10:00:02+00:00"),
+                ]
+                if include_applied:
+                    events.append(event("Progress", "Communication applied on steering:text: Check agents.", 3, "2026-10-24T10:00:02.1+00:00"))
+                events.append(event("Thinking", "After steering.", 4, "2026-10-24T10:00:03+00:00"))
+                self.write_events(events)
+
+                payload = self.parse()
+
+                self.assertEqual(2, len(payload["turns"]))
+                self.assertEqual("steering", payload["turns"][0]["endReason"])
+                self.assertEqual("steering", payload["turns"][1]["startReason"])
+                self.assertEqual(int(include_applied), len(payload["turns"][1]["queuedMessagesBefore"]))
+                self.assertEqual(1, sum(entry["type"] == "steering" for entry in payload["turns"][0]["timeline"]))
+
+    def test_distinct_steering_events_with_identical_text_are_not_dropped(self):
+        self.write_events([
+            event("Thinking", "Working.", 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication applied on steering:text: Check agents.", 2, "2026-10-24T10:00:02+00:00"),
+            event("Progress", "Communication applied on steering:text: Check agents.", 3, "2026-10-24T10:00:02.1+00:00"),
+            event("Thinking", "Checking now.", 4, "2026-10-24T10:00:03+00:00"),
+        ])
+
+        payload = self.parse()
+
+        self.assertEqual(2, len(payload["turns"]))
+        self.assertEqual(["steering-2", "steering-3"], [message["id"] for message in payload["turns"][1]["queuedMessagesBefore"]])
+
+    def test_non_steering_configuration_progress_does_not_interrupt(self):
+        self.write_events([
+            event("Thinking", "Working.", 1, "2026-10-24T10:00:01+00:00"),
+            event("Progress", "Communication applied on config:model: model-name", 2, "2026-10-24T10:00:02+00:00"),
+            event("Observation", "Still working.", 3, "2026-10-24T10:00:03+00:00"),
+        ])
+
+        payload = self.parse()
+
+        self.assertEqual(1, len(payload["turns"]))
+        self.assertIsNone(payload["turns"][0]["endedAt"])
+        self.assertEqual("Updated engine settings", payload["turns"][0]["timeline"][1]["summary"])
+        self.assertEqual([], payload["queuedMessages"])
+
+    def test_interrupted_context_group_does_not_keep_spinning(self):
+        title = "discovery-app-sdk-discovery-tasks-get"
+        self.write_events([
+            proposed(title, {"taskId": "DX-74"}, 1, "2026-10-24T10:00:01+00:00"),
+            applied(title, {"status": "completed"}, 2, "2026-10-24T10:00:01.1+00:00"),
+            proposed(title, {"taskId": "DX-75"}, 3, "2026-10-24T10:00:02+00:00"),
+            event("Progress", "Communication applied on steering:text: Change focus.", 4, "2026-10-24T10:00:03+00:00"),
+        ])
+
+        payload = self.parse()
+        group = payload["turns"][0]["timeline"][0]
+
+        self.assertEqual("group", group["type"])
+        self.assertEqual("interrupted", group["status"])
+        self.assertEqual(["completed", "interrupted"], [action["status"] for action in group["children"]])
+        self.assertEqual(0, payload["turns"][0]["pendingActionCount"])
+
     def test_thinking_stream_survives_interleaved_tool_events(self):
         title = "Viewing ...blog/knowledge/report.md"
         events = [
@@ -570,6 +747,229 @@ class EngineRunParserTests(unittest.TestCase):
         self.assertEqual("Grading v10.0", by_name["Agentic Grader"]["workingOn"])
         self.assertEqual("Queued", by_name["Agentic Grader"]["statusLabel"])
         self.assertNotIn("run-stale", [agent["runId"] for agent in payload["agents"]])
+
+
+class EngineHandoffTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.workspace = Path(self.temp.name)
+        self.run_dir = self.workspace / ".discovery" / "engine-runs" / "mission-control" / "handoff123"
+        self.run_dir.mkdir(parents=True)
+        self.tasks_path = self.workspace / ".discovery" / "tasks" / "index.json"
+        self.tasks_path.parent.mkdir(parents=True)
+        self.meta = {
+            "instanceId": "handoff123", "definitionId": "mission-control", "state": "Idle",
+            "startedAt": "2026-10-24T10:00:00+00:00", "completedAt": "2026-10-24T10:00:04+00:00",
+        }
+        self.events = [
+            proposed("discovery-app-sdk-discovery-tasks-comment", {"taskId": "DX-2", "text": "Finished the work."}, 1, "2026-10-24T10:00:01+00:00"),
+            applied("discovery-app-sdk-discovery-tasks-comment", {"status": "completed"}, 2, "2026-10-24T10:00:02+00:00"),
+            event("Observation", "All five DX-2 subtasks are at executionDone and waiting for your approval.", 3, "2026-10-24T10:00:03+00:00"),
+            event("Done", "Stop reason: end_turn", 4, "2026-10-24T10:00:04+00:00"),
+        ]
+        self.tasks = [
+            {"taskId": "root-task", "dxId": "DX-2", "status": "new", "title": "Milestone"},
+            *[{"taskId": "task-{}".format(number), "dxId": "DX-{}".format(number),
+               "status": status, "title": "Deliverable {}".format(number), "parentId": "root-task"}
+              for number, status in [(7, "complete"), (8, "complete"), (9, "incomplete"), (10, "executionDone"), (11, "incomplete")]],
+            {"taskId": "unrelated-task", "dxId": "DX-99", "status": "executionDone", "title": "Unrelated review"},
+        ]
+        self.write_run()
+        self.write_tasks()
+        self.repository = server.EngineRunRepository(self.workspace)
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def write_run(self):
+        (self.run_dir / "meta.json").write_text(json.dumps(self.meta), encoding="utf-8")
+        (self.run_dir / "output.jsonl").write_text("".join(json.dumps(item) + "\n" for item in self.events), encoding="utf-8")
+
+    def write_tasks(self):
+        self.tasks_path.write_text(json.dumps({"tasks": self.tasks}), encoding="utf-8")
+
+    def get_run(self):
+        return self.repository.get_run("mission-control", "handoff123")
+
+    def test_idle_finished_turn_surfaces_only_current_scoped_approval(self):
+        payload = self.get_run()
+        run = payload["run"]
+        attention = run["attention"]
+        self.assertEqual("Idle", run["state"])
+        self.assertEqual("Idle", run["stateLabel"])
+        self.assertEqual(self.meta["completedAt"], run["completedAt"])
+        self.assertEqual("Needs your action", attention["label"])
+        self.assertEqual("1 task needs your review", attention["title"])
+        self.assertEqual(["DX-10"], [task["id"] for task in attention["tasks"]])
+        self.assertEqual("Current task board", attention["source"])
+        self.assertEqual("turn-1", attention["turnId"])
+        self.assertEqual("observation-3", attention["entryId"])
+        self.assertNotIn("All five", attention["excerpt"])
+        self.assertIn("All five", payload["turns"][-1]["timeline"][-1]["summary"])
+
+    def test_only_reviewable_task_statuses_trigger_approval(self):
+        for status in ("executionDone", "flaggedHuman", "complete", "incomplete", "onHold", "stale", "failed", "flaggedAi", "new", "executing", "removed"):
+            with self.subTest(status=status):
+                self.tasks[4]["status"] = status
+                self.write_tasks()
+                self.assertEqual(status in {"executionDone", "flaggedHuman"}, self.get_run()["run"]["attention"] is not None)
+
+    def test_approval_refreshes_without_reparsing_logs_and_returns_snapshots(self):
+        first = self.get_run()
+        first_version = first["run"]["version"]
+        with mock.patch.object(self.repository.parser, "parse", side_effect=AssertionError("Logs did not change")):
+            self.tasks[-1]["title"] = "Unrelated edit must not churn the feed"
+            self.write_tasks()
+            self.assertEqual(first_version, self.get_run()["run"]["version"])
+            self.tasks[4]["status"] = "complete"
+            self.write_tasks()
+            resolved = self.get_run()
+            self.assertIsNone(resolved["run"]["attention"])
+            self.assertNotEqual(first_version, resolved["run"]["version"])
+            self.assertEqual("DX-10", first["run"]["attention"]["tasks"][0]["id"])
+
+    def test_missing_or_malformed_task_data_never_keeps_old_approval(self):
+        self.assertIsNotNone(self.get_run()["run"]["attention"])
+        for content in (None, b"{", b"\xff", b'{"tasks":{}}', b'{"tasks":[]}', b'{"tasks":[null,"invalid"]}'):
+            with self.subTest(content=content):
+                if content is None:
+                    self.tasks_path.unlink()
+                else:
+                    self.tasks_path.write_bytes(content)
+                self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_running_sleeping_and_terminal_states_keep_lifecycle_status(self):
+        for state in ("Running", "Sleeping", "Completed", "Stopped", "Failed", "Cancelled", "Unknown"):
+            with self.subTest(state=state):
+                self.meta["state"] = state
+                self.write_run()
+                run = self.get_run()["run"]
+                self.assertIsNone(run["attention"])
+                self.assertEqual(state, run["state"])
+                self.assertEqual(server.state_label(state), run["stateLabel"])
+
+    def test_paused_handoff_is_distinct_from_completion(self):
+        self.meta["state"] = "Paused"
+        self.write_run()
+        run = self.get_run()["run"]
+        self.assertEqual("Paused", run["stateLabel"])
+        self.assertEqual("Needs your action", run["attention"]["label"])
+
+    def test_completed_at_does_not_finish_an_open_turn(self):
+        self.events.pop()
+        self.write_run()
+        self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_pending_or_failed_actions_prevent_a_finished_handoff(self):
+        original = list(self.events)
+        for failed in (False, True):
+            with self.subTest(failed=failed):
+                extra = [proposed("Review artifacts", {}, 5, "2026-10-24T10:00:02.1+00:00")]
+                if failed:
+                    extra.append(event("Error", "Tool call failed: Review artifacts - failed", 6, "2026-10-24T10:00:02.2+00:00"))
+                self.events = original[:2] + extra + original[2:]
+                self.write_run()
+                self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_new_turn_or_pending_steering_clears_handoff(self):
+        original = list(self.events)
+        for kind, text in (
+            ("Thinking", "Starting the next pass."),
+            ("Progress", "Communication queued on steering:text: Continue."),
+            ("Progress", "Communication applied on steering:text: Continue."),
+        ):
+            with self.subTest(text=text):
+                self.events = original + [event(kind, text, 5, "2026-10-24T10:01:00+00:00")]
+                self.write_run()
+                self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_old_request_is_not_reused_after_more_activity_or_a_new_final_update(self):
+        original = list(self.events)
+        for has_update in (False, True):
+            with self.subTest(has_update=has_update):
+                self.events = original[:-1] + [
+                    proposed("Inspect the new artifacts", {}, 5, "2026-10-24T10:00:10+00:00"),
+                    applied("Inspect the new artifacts", {"status": "completed"}, 6, "2026-10-24T10:00:11+00:00"),
+                ]
+                if has_update:
+                    self.events.append(event("Observation", "All approvals are resolved. No action needed.", 7, "2026-10-24T10:00:12+00:00"))
+                self.events.append(event("Done", "Stop reason: end_turn", 8, "2026-10-24T10:00:13+00:00"))
+                self.write_run()
+                self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_scheduled_sleep_blocks_handoff_until_its_deadline_on_cache_hits(self):
+        title = "discovery-app-sdk-discovery-engine-sleep"
+        self.events = self.events[:2] + [
+            proposed(title, {"minutes": 2}, 5, "2026-10-24T10:00:02.1+00:00"),
+            applied(title, {"sleepUntil": "2026-10-24T10:02:00+00:00", "_sleepMinutes": 2, "status": "completed"}, 6, "2026-10-24T10:00:02.2+00:00"),
+        ] + self.events[2:]
+        self.write_run()
+        with mock.patch.object(server, "datetime", wraps=server.datetime) as clock:
+            clock.now.return_value = server.parse_time("2026-10-24T10:01:00+00:00")
+            sleeping = self.get_run()
+            self.assertIsNone(sleeping["run"]["attention"])
+            clock.now.return_value = server.parse_time("2026-10-24T10:03:00+00:00")
+            with mock.patch.object(self.repository.parser, "parse", side_effect=AssertionError("Logs did not change")):
+                awake = self.get_run()
+            self.assertIsNotNone(awake["run"]["attention"])
+            self.assertNotEqual(sleeping["run"]["version"], awake["run"]["version"])
+
+    def test_sleep_without_acknowledgement_is_not_a_handoff(self):
+        self.events.insert(2, proposed("discovery-app-sdk-discovery-engine-sleep", {"minutes": 2}, 5, "2026-10-24T10:00:02.1+00:00"))
+        self.write_run()
+        self.assertIsNone(self.get_run()["run"]["attention"])
+
+    def test_general_input_request_remains_explicitly_observation_based(self):
+        self.events = [event("Observation", "I need your input on the design.", 3, "2026-10-24T10:00:03+00:00"), self.events[-1]]
+        self.write_run()
+        self.tasks_path.unlink()
+        attention = self.get_run()["run"]["attention"]
+        self.assertEqual("input", attention["kind"])
+        self.assertEqual("Latest observation", attention["source"])
+        self.assertNotIn("tasks", attention)
+
+    def test_guid_task_references_do_not_expand_scope_from_progress_text(self):
+        title = "discovery-app-sdk-discovery-tasks-comment"
+        self.events[0] = proposed(title, {"taskId": "task-10", "text": "DX-99 is unrelated."}, 1, "2026-10-24T10:00:01+00:00")
+        self.events[2]["content"] = "The result is ready for your review."
+        self.write_run()
+        attention = self.get_run()["run"]["attention"]
+        self.assertEqual(["DX-10"], [task["id"] for task in attention["tasks"]])
+
+    def test_explicit_final_request_does_not_pull_in_other_touched_tasks(self):
+        self.tasks[1]["status"] = "executionDone"
+        self.write_tasks()
+        self.events[2]["content"] = "DX-10 is waiting for your approval."
+        self.write_run()
+        self.assertEqual(["DX-10"], [task["id"] for task in self.get_run()["run"]["attention"]["tasks"]])
+
+    def test_request_language_ignores_quotes_negation_history_and_resolution(self):
+        for text in (
+            "Waiting for delegated agents.", "The regulator needs approval.",
+            "We are not waiting for your approval.", "Your approval was already received.",
+            "Earlier we were waiting for your input.", "If it is ready for your review, send a note.",
+            'Example: "waiting for your approval".', "`waiting for your approval`",
+            "> Waiting for your approval.\nNo new request.",
+            "```text\nWaiting for your approval\n```", "We aren't waiting for your decision.",
+            "Waiting for your approval. Approval received.",
+            "Waiting for your input. No further action is required.",
+        ):
+            with self.subTest(text=text):
+                self.assertIsNone(server.explicit_user_request(text, self.workspace))
+        for text, kind in (
+            ("Waiting for your approval.", "approval"), ("Ready for your review.", "review"),
+            ("I need your input.", "input"), ("Awaiting your decision.", "decision"),
+            ("Pending your confirmation.", "confirmation"), ("Requires human review.", "review"),
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(kind, server.explicit_user_request(text, self.workspace)["kind"])
+
+    def test_handoff_rendering_does_not_mutate_run_or_task_files(self):
+        paths = [self.run_dir / "meta.json", self.run_dir / "output.jsonl", self.tasks_path]
+        before = [path.read_bytes() for path in paths]
+        self.get_run()
+        self.get_run()
+        self.assertEqual(before, [path.read_bytes() for path in paths])
 
 
 class EngineChatServerTests(unittest.TestCase):

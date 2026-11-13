@@ -9,7 +9,7 @@
     "statement": "Tested with Discovery 0.15.19 on macOS; other versions and platforms are untested."
   },
   "payloadHashes": {
-    "index.html": "5552a17dd53c10ef12a3f0362f7f64a42e07f394de974a973309076e89d57735",
-    "server.py": "451c69612ac2d01839bfda497504ea7ef6ba4a8a4693270f35b0d55866c8de3f"
+    "index.html": "8f30e5293643c22870f9391e6a901a07f767bf38b44dbf1c5cba7afa72dd411a",
+    "server.py": "7384396e6c31f78a6b8361cb015f780838df6e400aab6d1c62186b2686c44556"
   }
 }

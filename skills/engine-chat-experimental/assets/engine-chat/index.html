@@ -177,6 +177,7 @@
       display: flex;
       min-width: 0;
       gap: 8px;
+      flex-wrap: wrap;
       align-items: center;
     }
 
@@ -199,6 +200,19 @@
       font-weight: 600;
     }
 
+    .run-status.needs-action {
+      padding: 2px 8px;
+      border: 1px solid var(--cp-warning);
+      border-radius: 999px;
+      background: var(--cp-surface-soft);
+      color: var(--cp-text);
+    }
+
+    .engine-lifecycle {
+      color: var(--cp-text-muted);
+      font-size: 11px;
+    }
+
     .status-dot {
       width: 7px;
       height: 7px;
@@ -217,7 +231,8 @@
       background: var(--cp-danger);
     }
 
-    .status-dot.paused {
+    .status-dot.paused,
+    .status-dot.needs-your-action {
       background: var(--cp-warning);
     }
 
@@ -543,7 +558,7 @@
       margin-bottom: 0;
     }
 
-    .user-message-stack.pending .prompt-bubble {
+    .user-message.pending .prompt-bubble {
       border-color: var(--cp-accent);
       background: var(--cp-accent-soft);
     }
@@ -587,6 +602,10 @@
 
     .turn-thread[open] {
       border-color: var(--cp-border-strong);
+    }
+
+    .turn-thread.needs-action {
+      border-color: var(--cp-warning);
     }
 
     .turn-summary {
@@ -753,6 +772,12 @@
     }
 
     .timeline-marker.thinking {
+      color: var(--cp-accent);
+    }
+
+    .timeline-marker.steering {
+      border-color: var(--cp-accent);
+      background: var(--cp-accent-soft);
       color: var(--cp-accent);
     }
 
@@ -994,6 +1019,99 @@
       width: min(860px, 100%);
       margin: 0 auto;
       padding: 12px 24px 14px;
+    }
+
+    .action-required {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--cp-warning);
+      border-left-width: 4px;
+      border-radius: 0.625rem;
+      background: var(--cp-surface);
+    }
+
+    .action-required[hidden] {
+      display: none;
+    }
+
+    .action-required-icon {
+      display: grid;
+      width: 28px;
+      height: 28px;
+      place-items: center;
+      border: 1px solid var(--cp-warning);
+      border-radius: 50%;
+      color: var(--cp-text);
+      font-weight: 700;
+    }
+
+    .action-required-eyebrow {
+      margin: 0 0 2px;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .action-required h2 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .action-required-description {
+      margin: 4px 0 8px;
+      font-size: 12px;
+    }
+
+    .action-required-quote {
+      display: -webkit-box;
+      overflow: hidden;
+      margin: 0;
+      padding-left: 10px;
+      border-left: 2px solid var(--cp-border);
+      color: var(--cp-text-muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+      white-space: pre-line;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
+    }
+
+    .action-required-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .action-required-source {
+      margin: 0;
+      color: var(--cp-text-muted);
+      font-size: 10px;
+    }
+
+    .review-update-button {
+      min-height: 34px;
+      padding: 6px 12px;
+      border: 1px solid var(--cp-accent);
+      border-radius: 0.625rem;
+      background: var(--cp-accent);
+      color: var(--cp-accent-fg);
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .review-update-button:hover {
+      border-color: var(--cp-accent-hover);
+      background: var(--cp-accent-hover);
     }
 
     .composer-label-row {
@@ -1256,6 +1374,7 @@
                 <span class="status-dot" id="status-dot"></span>
                 <span id="status-label">Connecting</span>
               </span>
+              <span class="engine-lifecycle" id="engine-lifecycle" hidden></span>
             </div>
             <div class="sync-line" id="sync-line">Reading the latest engine-run logs…</div>
           </div>
@@ -1288,18 +1407,35 @@
 
         <footer class="composer-region">
           <div class="composer-inner">
-            <div class="composer-label-row">
-              <span>Steering disabled</span>
-              <span class="preview-badge">0.1.0-experimental</span>
-            </div>
-            <div class="composer-box">
-              <textarea disabled aria-label="Steering is disabled" placeholder="Steering is disabled in this experimental release."></textarea>
-              <button class="send-button" type="button" disabled aria-label="Steering is disabled">
-                <svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-                  <path d="m5 12 14-7-4 14-3-5-7-2Z"></path>
-                  <path d="m12 14 7-9"></path>
-                </svg>
-              </button>
+            <section class="action-required" id="action-required" aria-labelledby="action-required-title" hidden>
+              <span class="action-required-icon" aria-hidden="true">!</span>
+              <div>
+                <div role="status" aria-live="polite" aria-atomic="true">
+                  <p class="action-required-eyebrow">Your turn</p>
+                  <h2 id="action-required-title"></h2>
+                  <p class="action-required-description" id="action-required-description"></p>
+                </div>
+                <p class="action-required-quote" id="action-required-quote"></p>
+                <div class="action-required-footer">
+                  <p class="action-required-source" id="action-required-source"></p>
+                  <button class="review-update-button" id="review-update-button" type="button">Review latest update</button>
+                </div>
+              </div>
+            </section>
+            <div id="composer-controls">
+              <div class="composer-label-row">
+                <span>Steering disabled</span>
+                <span class="preview-badge">0.1.0-experimental</span>
+              </div>
+              <div class="composer-box">
+                <textarea disabled aria-label="Steering is disabled" placeholder="Steering is disabled in this experimental release."></textarea>
+                <button class="send-button" type="button" disabled aria-label="Steering is disabled">
+                  <svg class="inline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="m5 12 14-7-4 14-3-5-7-2Z"></path>
+                    <path d="m12 14 7-9"></path>
+                  </svg>
+                </button>
+              </div>
             </div>
             <p class="composer-note">Local-only view: starting prompts and delegated prompts from local Discovery logs are visible. Raw action, output, and error payloads remain hidden.</p>
             <p class="composer-note">Tested with Discovery 0.15.19 on macOS; other versions and platforms are untested.</p>
@@ -1354,6 +1490,8 @@
         feedInner: document.getElementById("feed-inner"),
         picker: document.getElementById("run-picker"),
         engineTitle: document.getElementById("engine-title"),
+        runStatus: document.getElementById("run-status"),
+        engineLifecycle: document.getElementById("engine-lifecycle"),
         statusDot: document.getElementById("status-dot"),
         statusLabel: document.getElementById("status-label"),
         syncLine: document.getElementById("sync-line"),
@@ -1362,10 +1500,18 @@
         agentList: document.getElementById("agent-list"),
         agentCount: document.getElementById("agent-count"),
         agentRailSync: document.getElementById("agent-rail-sync"),
+        actionRequired: document.getElementById("action-required"),
+        actionTitle: document.getElementById("action-required-title"),
+        actionDescription: document.getElementById("action-required-description"),
+        actionQuote: document.getElementById("action-required-quote"),
+        actionSource: document.getElementById("action-required-source"),
+        reviewButton: document.getElementById("review-update-button"),
+        composerControls: document.getElementById("composer-controls"),
       };
 
       const icons = {
         chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>',
+        steering: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H5l-3 3V11a8 8 0 0 1 8-8h3a8 8 0 0 1 8 8Z"></path><path d="M7 9h10M7 13h7"></path></svg>',
         thought: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M8.5 14.5A7 7 0 1 1 15.5 14.5C14.6 15.2 14 16.1 14 17h-4c0-.9-.6-1.8-1.5-2.5Z"></path></svg>',
         work: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16v13H4z"></path><path d="M9 7V4h6v3"></path><path d="M4 12h16"></path></svg>',
         observation: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12s-3.5 6-9 6-9-6-9-6 3.5-6 9-6 9 6 9 6Z"></path><circle cx="12" cy="12" r="2.5"></circle></svg>',
@@ -1396,21 +1542,79 @@
         return String(label || "unknown").toLowerCase().replaceAll(" ", "-");
       }
 
+      function activeAttention(data) {
+        const run = data?.run;
+        const latest = data?.turns?.at(-1);
+        if (!run?.attention || !["idle", "paused"].includes(String(run.state).toLowerCase())) return null;
+        if (!latest?.endedAt || latest.endReason === "steering" || latest.pendingActionCount || latest.failedActionCount) return null;
+        if (run.attention.turnId !== latest.id || data.queuedMessages?.length) return null;
+        const sleep = latest.sleep;
+        const until = dateValue(sleep?.until);
+        if (sleep?.status === "pending" || (sleep?.status === "scheduled" && (!until || until.getTime() > Date.now()))) return null;
+        return run.attention;
+      }
+
       function effectiveRunStatus(data) {
         if (!data) return "Connecting";
         const latest = data.turns?.at(-1);
         const until = dateValue(latest?.sleep?.until);
-        if (latest?.sleep?.status === "scheduled" && until && until.getTime() > Date.now()) {
+        const terminal = ["completed", "failed", "stopped", "cancelled"].includes(String(data.run.state).toLowerCase());
+        if (!terminal && latest?.sleep?.status === "scheduled" && until && until.getTime() > Date.now()) {
           return "Sleeping";
         }
-        return data.run.stateLabel;
+        return activeAttention(data)?.label || data.run.stateLabel;
       }
 
       function updateHeaderStatus() {
-        if (!state.runData) return;
         const label = effectiveRunStatus(state.runData);
-        elements.statusLabel.textContent = label;
+        if (elements.statusLabel.textContent !== label) elements.statusLabel.textContent = label;
         elements.statusDot.className = `status-dot ${statusClass(label)}`;
+        const attention = activeAttention(state.runData);
+        const rawState = state.runData?.run.state || "Unknown";
+        elements.runStatus.className = `run-status${attention ? " needs-action" : ""}`;
+        elements.runStatus.title = attention
+          ? `${attention.title}. Engine state: ${rawState}. Source: ${attention.source}.`
+          : `Engine state: ${rawState}`;
+        elements.engineLifecycle.hidden = !attention;
+        const lifecycle = attention ? `Engine: ${rawState}` : "";
+        if (elements.engineLifecycle.textContent !== lifecycle) elements.engineLifecycle.textContent = lifecycle;
+      }
+
+      function updateActionRequired(data) {
+        const attention = activeAttention(data);
+        elements.actionRequired.hidden = !attention;
+        elements.composerControls.hidden = !!attention;
+        elements.actionTitle.textContent = attention?.title || "";
+        elements.actionDescription.textContent = attention?.description || "";
+        elements.actionQuote.textContent = attention?.excerpt || "";
+        elements.actionSource.textContent = attention
+          ? `${attention.source}${attention.source === "Latest observation" ? ` · ${formatTime(attention.requestedAt)}` : " · checked live"} · Engine state: ${data.run.state}`
+          : "";
+      }
+
+      function reviewLatestUpdate() {
+        const data = state.runData;
+        const attention = activeAttention(data);
+        if (!attention) return;
+        const turnKey = `${data.run.instanceId}-${attention.turnId}`;
+        const turn = [...elements.feedInner.querySelectorAll("details[data-open-key]")]
+          .find((element) => element.dataset.openKey === turnKey);
+        const entry = turn && [...turn.querySelectorAll("[data-entry-id]")]
+          .find((element) => element.dataset.entryId === attention.entryId);
+        if (!turn || !entry) return;
+        for (const element of [turn, entry]) {
+          if (element.tagName !== "DETAILS") continue;
+          element.open = true;
+          state.touchedKeys.add(element.dataset.openKey);
+          state.openKeys.add(element.dataset.openKey);
+        }
+        state.following = false;
+        requestAnimationFrame(() => {
+          entry.scrollIntoView({ block: "start", behavior: "auto" });
+          const target = entry.querySelector("summary") || entry;
+          if (target === entry) target.setAttribute("tabindex", "-1");
+          target.focus({ preventScroll: true });
+        });
       }
 
       function dateValue(value) {
@@ -1499,10 +1703,14 @@
         if (action.status === "followup") {
           return '<span class="action-state" aria-label="Continued with a follow-up">↻</span>';
         }
+        if (action.status === "interrupted") {
+          return '<span class="action-state" aria-label="Interrupted by steering">⏸</span>';
+        }
         return '<span class="action-state" aria-label="In progress"><span class="action-spinner" aria-hidden="true"></span></span>';
       }
 
       function entryIcon(entry) {
+        if (entry.type === "steering") return icons.steering;
         if (entry.visual === "agent") return icons.agent;
         if (entry.type === "group" && entry.groupKind === "context") return icons.context;
         if (entry.type === "thinking") return icons.thought;
@@ -1555,11 +1763,11 @@
         const detail = entry.detail || "";
         const entryClass = entry.visual === "agent" ? " agent-launch" : "";
         if (!detail) {
-          return `<div class="timeline-entry${entryClass}">${renderTimelineRow(entry, false)}</div>`;
+          return `<div class="timeline-entry${entryClass}" data-entry-id="${escapeHtml(entry.id)}">${renderTimelineRow(entry, false)}</div>`;
         }
         const key = `${turnKey}-${entry.id}`;
         return `
-          <details class="timeline-entry${entryClass}" data-open-key="${escapeHtml(key)}"${openAttribute(key, false)}>
+          <details class="timeline-entry${entryClass}" data-entry-id="${escapeHtml(entry.id)}" data-open-key="${escapeHtml(key)}"${openAttribute(key, false)}>
             ${renderTimelineRow(entry, true)}
             <div class="timeline-detail">
               <p class="timeline-detail-label">${escapeHtml(entry.detailLabel || "Details")}</p>
@@ -1609,29 +1817,36 @@
           </article>`;
       }
 
-      function renderQueuedMessages(messages, key, defaultOpen = false) {
+      function renderSteeringMessages(messages, key, pending = false) {
         if (!messages?.length) return "";
-        const pending = defaultOpen;
-        const label = pending ? "Queued message" : "Message";
         return `
-          <section class="user-message-stack${pending ? " pending" : ""}" data-message-key="${escapeHtml(key)}">
-            ${messages.map((message) => `
-              <article class="starting-prompt user-message">
+          <section class="user-message-stack" data-message-key="${escapeHtml(key)}">
+            ${messages.map((message) => {
+              const applied = message.delivery === "applied";
+              const label = applied ? "Steering message" : pending ? "Queued message" : "Message";
+              const timestamp = message.receivedAt || message.queuedAt;
+              return `
+              <article class="starting-prompt user-message${pending && !applied ? " pending" : ""}" aria-label="${escapeHtml(label)}" data-message-id="${escapeHtml(message.id)}">
                 <div class="prompt-bubble">
                   <div class="prompt-label-row">
                     <p class="prompt-label">${escapeHtml(label)}</p>
-                    <time class="message-time" datetime="${escapeHtml(message.queuedAt || "")}">${escapeHtml(formatTime(message.queuedAt))}</time>
+                    <time class="message-time" datetime="${escapeHtml(timestamp || "")}">${escapeHtml(formatTime(timestamp))}</time>
                   </div>
                   <p class="prompt-text">${escapeHtml(message.text)}</p>
                 </div>
                 <span class="user-avatar" aria-hidden="true">YOU</span>
-              </article>`).join("")}
+              </article>`;
+            }).join("")}
           </section>`;
       }
 
       function turnStatus(turn, isLatest, run) {
+        if (turn.endReason === "steering") return "Interrupted";
+        const attention = isLatest ? activeAttention({ run, turns: [turn] }) : null;
+        if (attention) return attention.label;
         const sleepUntil = dateValue(turn.sleep?.until);
-        if (isLatest && sleepUntil && sleepUntil.getTime() > Date.now()) return "Sleeping";
+        const terminal = ["completed", "failed", "stopped", "cancelled"].includes(String(run.state).toLowerCase());
+        if (isLatest && !terminal && turn.sleep?.status === "scheduled" && sleepUntil && sleepUntil.getTime() > Date.now()) return "Sleeping";
         if (isLatest && !turn.endedAt && run.isLive) return "Live";
         if (turn.failedActionCount) return `${turn.failedActionCount} need attention`;
         if (turn.pendingActionCount) return `${turn.pendingActionCount} in progress`;
@@ -1643,10 +1858,11 @@
         const turnKey = `${run.instanceId}-${turn.id}`;
         const status = turnStatus(turn, isLatest, run);
         const isLive = status === "Live" || status === "Sleeping";
+        const attention = isLatest ? activeAttention({ run, turns }) : null;
         const eventCount = (turn.timeline || []).length;
-        const title = turn.endedAt ? (turn.summary || "Turn complete") : turn.intro;
+        const title = attention?.title || (turn.endedAt ? (turn.summary || "Turn complete") : turn.intro);
         return `
-          <details class="turn-thread" data-open-key="${escapeHtml(turnKey)}"${openAttribute(turnKey, isLatest)}>
+          <details class="turn-thread${attention ? " needs-action" : ""}" data-open-key="${escapeHtml(turnKey)}"${openAttribute(turnKey, isLatest)}>
             <summary class="turn-summary">
               <div class="turn-title-block">
                 <div class="turn-eyebrow">
@@ -1673,6 +1889,7 @@
         const turns = data.turns || [];
         elements.engineTitle.textContent = run.displayName;
         updateHeaderStatus();
+        updateActionRequired(data);
         elements.syncLine.textContent = `${data.stats.turns} turns · ${data.stats.actions} actions · updated ${relativeTime(run.updatedAt)}`;
 
         if (!turns.length) {
@@ -1697,10 +1914,10 @@
             </div>
           </div>
           ${turns.map((turn, index) => `
-            ${renderQueuedMessages(turn.queuedMessagesBefore, `${run.instanceId}-${turn.id}-queued-before`, false)}
+            ${renderSteeringMessages(turn.queuedMessagesBefore, `${run.instanceId}-${turn.id}-queued-before`)}
             ${renderTurn(turn, index, turns, run)}
           `).join("")}
-          ${renderQueuedMessages(data.queuedMessages, `${run.instanceId}-queued-next`, true)}`;
+          ${renderSteeringMessages(data.queuedMessages, `${run.instanceId}-queued-next`, true)}`;
 
         bindDetailState();
         updateSleepCountdowns();
@@ -1725,7 +1942,8 @@
           const status = card.dataset.sleepStatus;
           const duration = Math.max(0, Number(card.dataset.sleepDuration) || 0);
           const until = dateValue(card.dataset.sleepUntil);
-          if (status === "failed") {
+          if (status === "failed" || status === "interrupted") {
+            if (status === "interrupted") title.textContent = "Sleep interrupted by steering";
             countdown.textContent = "—";
             progress.style.setProperty("--sleep-progress", "0%");
             return;
@@ -1754,7 +1972,10 @@
         const current = state.selectedKey;
         elements.picker.innerHTML = state.runs.map((run) => {
           const key = keyFor(run);
-          const runStatus = key === current && state.runData ? effectiveRunStatus(state.runData) : run.stateLabel;
+          const data = key === current && state.runData && keyFor(state.runData.run) === key ? state.runData : null;
+          const runStatus = data
+            ? `${effectiveRunStatus(data)}${activeAttention(data) ? ` (${data.run.state})` : ""}`
+            : run.stateLabel;
           const label = `${run.displayName} · ${runStatus} · ${formatTime(run.updatedAt)} · ${run.shortId}`;
           return `<option value="${escapeHtml(key)}"${key === current ? " selected" : ""}>${escapeHtml(label)}</option>`;
         }).join("");
@@ -1810,6 +2031,10 @@
           state.recommendedKey = payload.recommended ? keyFor(payload.recommended) : null;
           if (!state.runs.length) {
             state.selectedKey = null;
+            state.runData = null;
+            state.version = null;
+            updateHeaderStatus();
+            updateActionRequired(null);
             renderRunOptions();
             showEmpty("No engine runs found", "Start an engine run and its activity will appear here automatically.");
             return;
@@ -1818,6 +2043,9 @@
           if (!selectedStillExists || (!state.userSelected && state.recommendedKey && state.selectedKey !== state.recommendedKey)) {
             state.selectedKey = state.recommendedKey || keyFor(state.runs[0]);
             state.version = null;
+            state.runData = null;
+            updateHeaderStatus();
+            updateActionRequired(null);
           }
           renderRunOptions();
           await refreshSelectedRun();
@@ -1860,9 +2088,11 @@
       async function refreshSelectedRun() {
         if (!state.selectedKey || state.loading) return;
         state.loading = true;
-        const [definitionId, instanceId] = state.selectedKey.split("/");
+        const requestedKey = state.selectedKey;
+        const [definitionId, instanceId] = requestedKey.split("/");
         try {
           const data = await fetchJson(`/api/runs/${encodeURIComponent(definitionId)}/${encodeURIComponent(instanceId)}`);
+          if (state.selectedKey !== requestedKey) return;
           state.lastSyncAt = new Date();
           if (data.run.version !== state.version) {
             const shouldFollow = state.following && isNearBottom();
@@ -1902,6 +2132,8 @@
         state.userSelected = true;
         state.version = null;
         state.runData = null;
+        updateHeaderStatus();
+        updateActionRequired(null);
         state.following = true;
         elements.feed.setAttribute("aria-busy", "true");
         renderRunOptions();
@@ -1913,12 +2145,16 @@
         state.selectedKey = state.recommendedKey;
         state.userSelected = false;
         state.version = null;
+        state.runData = null;
+        updateHeaderStatus();
+        updateActionRequired(null);
         state.following = true;
         renderRunOptions();
         await refreshSelectedRun();
       });
 
       elements.jumpButton.addEventListener("click", () => scrollToLatest());
+      elements.reviewButton.addEventListener("click", reviewLatestUpdate);
 
       elements.feed.addEventListener("scroll", () => {
         const nearBottom = isNearBottom();
