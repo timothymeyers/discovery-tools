@@ -1,6 +1,6 @@
 {
   "name": "discovery-tools",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Agents, skills, and starter kits for Microsoft Discovery — the AI for Science platform. Life-sciences data skills for SABIO-RK, BRENDA, BioCyc/EcoCyc/CyanoCyc, AlphaFold DB, and Rhea/ChEBI/MetaNetX/UniProt identifier crosswalks, plus cross-domain skills for scientific database access, evidence QC, Discovery agent deployment, project pre-flight clarification, and task design, workspace token-usage mining, live project dashboards, evidence-true project story replays, arxiv-ready paper builds, and DOE literature retrieval. Every skill declares its scientific category and subfield.",
   "author": {
     "name": "Tim Meyers",

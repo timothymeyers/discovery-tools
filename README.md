@@ -90,6 +90,7 @@ nothing from them.
 | Catalog | Author | License | Layout |
 |---|---|---|---|
 | [`genesis-skills`](https://gitlab.osti.gov/genesis/genesis-skills/) — Agent Skills for science and engineering from the DOE **Genesis Mission**: HPC job submission (Slurm, PBS, Aurora, Frontier, Perlmutter), plasma simulation (Gkeyll, GS2), scientific-data metadata and schemas, AI evaluation, AI safety, research data-movement APIs, literature search, multi-agent systems | ModCon / Genesis Mission | **Mixed — per skill** (root BSD-2-Clause) | Mostly scoped (`skills/<scope>/<skill>/`), some flat — `gh skill install`-able (29 of 36) |
+| [`microsoft-discovery`](https://github.com/microsoft/discovery) — Microsoft's public Discovery catalog: 120+ containerized science agents, domain starter kits, QuickStart scenarios, and nine Agent Skills (agent and kit deployers, QuickStart runner, token estimator, paper builder) | Microsoft | MIT | Flat `skills/<skill>/` plus hidden `.github/skills/<skill>/` (needs `--allow-hidden-dirs`) — `gh skill install`-able |
 
 The link above is the OSTI GitLab project, which is a **read-only mirror**. Its
 own README designates [`AI-ModCon/genesis-skills`](https://github.com/AI-ModCon/genesis-skills)
@@ -127,6 +128,13 @@ that explores the catalog in place without copying anything. **Prefer a
 per-skill `gh skill install`, or `skill-search` when you only want to look** —
 installing 36 unreviewed skills to obtain one is not a reasonable trade.
 
+**microsoft-discovery** overlaps with this catalog: upstream `add-example-agents`,
+`build-research-paper`, and `discovery-design-tasks` are the same skills as ours
+(ours scrub an internal registry name and add catalog metadata). Prefer ours. The
+[`discovery-project-kit`](starter-kits/discovery-project-kit) starter kit installs
+one upstream skill, `token-estimator-mvp`, pinned at
+[`d424c9e`](https://github.com/microsoft/discovery/tree/d424c9e7e6b769fdfdbe0c63bea4ad8ff7a82ecf).
+
 The machine-readable registry is [`tools/external-catalogs.json`](tools/external-catalogs.json),
 which carries the pinned refs, the per-subtree licensing notes, the domain
 inventory, and safety metadata.
@@ -150,9 +158,23 @@ inventory, and safety metadata.
 
 None yet. Custom agents will live in `agents/` as `*.agent.md`.
 
+### Plugins
+
+The marketplace offers two plugins built from the same `skills/` folder:
+
+| Plugin | Skills | For |
+|---|---|---|
+| `discovery-tools` | All of them | Everything in this catalog |
+| [`discovery-project-kit`](plugins/discovery-project-kit) | `discovery-add-agents`, `discovery-status-board`, `engine-chat-experimental`, `discovery-gather-exhaust`, `discovery-token-usage`, `build-research-paper` | Running one Discovery project: deploy agents, watch it, keep its records, write it up |
+
+A curated plugin's `skills/` holds symlinks into the root `skills/`, so no skill
+exists twice. Plugin installers copy the real files.
+
 ### Starter kits
 
-None yet. See [`starter-kits/`](starter-kits).
+| Kit | What it sets up |
+|---|---|
+| [`discovery-project-kit`](starter-kits/discovery-project-kit) | Enables the `discovery-project-kit` plugin for a project, and optionally installs the pinned upstream `token-estimator-mvp` skill from microsoft/discovery |
 
 ---
 
@@ -201,6 +223,15 @@ copilot plugin install timothymeyers/discovery-tools
 ```
 
 In VS Code: Extensions view → search `@agentPlugins`, or Command Palette → **Chat: Plugins**.
+
+### GitHub Copilot CLI — curated plugin
+
+Just the project-operations subset (six skills):
+
+```bash
+copilot plugin marketplace add timothymeyers/discovery-tools
+copilot plugin install discovery-project-kit@discovery-tools
+```
 
 ### Claude Code — full plugin
 
@@ -260,10 +291,11 @@ prompt you before running anything. Report issues per [SECURITY.md](SECURITY.md)
 discovery-tools/
 ├── plugin.json                     # plugin manifest — plugin root IS the repo root
 ├── skills/<name>/SKILL.md          # the catalog; installable via `gh skill install`
+ plugins/<name>/                 # curated plugins: plugin.json + skills/ symlinks into skills/
 ├── tools/external-tools.json       # registry of external tools (pointers, never vendored)
 ├── tools/external-catalogs.json    # registry of external skill catalogs (pointers too)
 ├── agents/<name>.agent.md          # custom agents (none yet)
-├── starter-kits/<name>/            # project scaffolds (none yet)
+├── starter-kits/<name>/            # project scaffolds
 ├── .github/plugin/marketplace.json # Copilot CLI marketplace manifest
 ├── .claude-plugin/marketplace.json # byte-identical copy for Claude Code; CI enforces sync
 └── .github/copilot/settings.json   # this repo dogfoods its own plugin
@@ -272,6 +304,11 @@ discovery-tools/
 Why `.claude-plugin/marketplace.json` is a real file rather than a symlink (which is what
 `github/copilot-plugins` uses): git symlinks degrade to plain text files on Windows clones
 and in downloaded ZIPs. CI asserts the two files stay byte-identical.
+
+Curated plugins under `plugins/` are the one place symlinks are used, because a
+copy would put a skill in the repository twice. Plugin installers resolve them to
+real files; in a Windows clone or a ZIP download they will not resolve, so install
+those plugins through `copilot plugin install`, not from a local checkout.
 
 ## Versioning
 

@@ -1,0 +1,22 @@
+{
+  "name": "discovery-project-kit",
+  "version": "0.9.0",
+  "description": "Curated subset of discovery-tools for running a Microsoft Discovery project: deploy catalog agents, watch outcomes and engine runs, keep the project's records (exhaust and token usage), and write it up as a paper. Pair with the discovery-project-kit starter kit to add the pinned upstream token estimator.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-project-kit",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "microsoft-discovery",
+    "ai-for-science",
+    "starter-kit",
+    "observability",
+    "project-status",
+    "token-usage",
+    "discovery-agents",
+    "research-paper"
+  ]
+}

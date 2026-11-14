@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Agents, skills, and starter kits for Microsoft Discovery (AI for Science), categorized by scientific domain",
-    "version": "0.8.0"
+    "version": "0.9.0"
   },
   "plugins": [
     {
       "name": "discovery-tools",
       "description": "Agents, skills, and starter kits for Microsoft Discovery \u2014 the AI for Science platform. Life-sciences data skills for SABIO-RK, BRENDA, BioCyc/EcoCyc/CyanoCyc, AlphaFold DB, and Rhea/ChEBI/MetaNetX/UniProt identifier crosswalks, plus cross-domain skills for scientific database access, evidence QC, Discovery agent deployment, project pre-flight clarification, and task design, workspace token-usage mining, live project dashboards, evidence-true project story replays, arxiv-ready paper builds, and DOE literature retrieval. Every skill declares its scientific category and subfield.",
-      "version": "0.8.0",
+      "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
         "url": "https://github.com/timothymeyers"
@@ -72,6 +72,29 @@
         "source": "github",
         "repo": "timothymeyers/discovery-tools"
       }
+    },
+    {
+      "name": "discovery-project-kit",
+      "description": "Curated subset of discovery-tools for running a Microsoft Discovery project: deploy catalog agents, watch outcomes and engine runs, keep the project's records (exhaust and token usage), and write it up as a paper. Pair with the discovery-project-kit starter kit to add the pinned upstream token estimator.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-project-kit",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "microsoft-discovery",
+        "ai-for-science",
+        "starter-kit",
+        "observability",
+        "project-status",
+        "token-usage",
+        "discovery-agents",
+        "research-paper"
+      ],
+      "source": "./plugins/discovery-project-kit"
     }
   ]
 }
