@@ -346,7 +346,109 @@ def check_manifests():
         if not has_agents:
             err(f"plugin.json: declares agents at {pj['agents']!r} but none were found")
 
+    for entry in a.get("plugins", []):
+        check_curated_plugin(entry, versions)
+
     print("manifests OK")
+
+
+def check_curated_plugin(entry, versions):
+    """Lint a marketplace entry that points at a curated plugin under plugins/.
+
+    A curated plugin is a subset of skills/. Copilot CLI ignores a marketplace
+    entry's own `skills` list whenever the source directory has a plugin.json
+    (the repo root does), so a subset needs its own directory. Its skills/ must
+    hold only symlinks into the root skills/ — installers resolve them to real
+    files — so no skill ever exists twice in the repository.
+    """
+    name = entry.get("name", "<unnamed>")
+    source = entry.get("source")
+    if not isinstance(source, str) or source.rstrip("/") in (".", ""):
+        return
+    rel = os.path.normpath(source)
+    pdir = os.path.join(ROOT, rel)
+    if not os.path.isdir(pdir):
+        err(f"marketplace.json: plugin {name!r} source {source!r} does not exist")
+        return
+
+    manifest = os.path.join(pdir, "plugin.json")
+    if not os.path.isfile(manifest):
+        err(f"{rel}: missing plugin.json")
+        return
+    try:
+        pj = json.load(open(manifest, encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        err(f"{rel}/plugin.json: invalid JSON — {e}")
+        return
+    if pj.get("name") != name:
+        err(f"{rel}/plugin.json: name {pj.get('name')!r} does not match marketplace entry {name!r}")
+    if pj.get("version") and pj.get("version") not in versions:
+        err(
+            f"{rel}/plugin.json: version {pj['version']!r} is out of sync with the "
+            f"catalog version(s) {sorted(versions)}"
+        )
+
+    sdir = os.path.join(pdir, "skills")
+    if not os.path.isdir(sdir):
+        err(f"{rel}: curated plugin has no skills/ directory")
+        return
+    skills_root = os.path.realpath(os.path.join(ROOT, "skills"))
+    links = sorted(f for f in os.listdir(sdir) if not f.startswith("."))
+    if not links:
+        err(f"{rel}/skills: curated plugin lists no skills")
+    for f in links:
+        p = os.path.join(sdir, f)
+        if not os.path.islink(p):
+            err(
+                f"{rel}/skills/{f}: must be a symlink into skills/, not a copy — "
+                f"every skill lives once, under skills/"
+            )
+            continue
+        target = os.path.realpath(p)
+        if os.path.dirname(target) != skills_root or os.path.basename(target) != f:
+            err(f"{rel}/skills/{f}: symlink must point at skills/{f}")
+        elif not os.path.isfile(os.path.join(target, "SKILL.md")):
+            err(f"{rel}/skills/{f}: points at skills/{f}, which has no SKILL.md")
+
+
+def check_starter_kit_pins():
+    """A starter kit that installs from an external catalog must use its pinned ref.
+
+    Kits reference upstream skills by commit so a project gets exactly what this
+    catalog reviewed. Any 40-char SHA in a kit file that mentions a registered
+    catalog's repository must equal that catalog's sourceRef; moving the pin means
+    updating the registry and the kit together.
+    """
+    kits = os.path.join(ROOT, "starter-kits")
+    reg_path = os.path.join(ROOT, "tools", "external-catalogs.json")
+    if not os.path.isdir(kits) or not os.path.isfile(reg_path):
+        return
+    try:
+        catalogs = json.load(open(reg_path, encoding="utf-8")).get("catalogs", [])
+    except json.JSONDecodeError:
+        return  # reported by check_external_catalogs
+    pins = {}
+    for c in catalogs:
+        m = re.match(r"https://github\.com/([^/]+/[^/]+?)/?$", c.get("repository", ""))
+        if m and c.get("sourceRefType") == "commit":
+            pins[m.group(1)] = (c.get("name"), c.get("sourceRef"))
+
+    for dirpath, _, filenames in os.walk(kits):
+        for fn in filenames:
+            if not fn.endswith(TEXT_EXT):
+                continue
+            path = os.path.join(dirpath, fn)
+            body = open(path, encoding="utf-8", errors="replace").read()
+            for slug, (cname, ref) in pins.items():
+                if slug not in body:
+                    continue
+                for sha in set(re.findall(r"\b[0-9a-f]{40}\b", body)):
+                    if sha != ref:
+                        err(
+                            f"{os.path.relpath(path, ROOT)}: pins {slug} at {sha[:12]}..., "
+                            f"but tools/external-catalogs.json ({cname}) pins {ref[:12]}... — "
+                            f"move both together"
+                        )
 
 
 def check_external_tools():
@@ -669,6 +771,7 @@ def main():
     check_manifests()
     check_external_tools()
     check_external_catalogs()
+    check_starter_kit_pins()
 
     for w in warnings:
         print(f"WARN  {w}")

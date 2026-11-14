@@ -9,6 +9,8 @@ A public catalog of agent skills, custom agents, and starter kits for Microsoft 
 The plugin root is the repo root, so `skills/` serves double duty: it is both the Agent
 Skills distribution convention (`gh skill install`) and the plugin component location
 (`copilot plugin install`). Do not move it, and do not create a second copy of any skill.
+Curated plugins under `plugins/<name>/` offer a subset by symlinking into `skills/`;
+add skills to them with `ln -s`, never `cp`. CI enforces this.
 
 ## Hard rules
 
@@ -31,6 +33,9 @@ Skills distribution convention (`gh skill install`) and the plugin component loc
    Never run an external catalog's installer (e.g. an `unpack.sh`) on a user's
    behalf without explicit consent — it writes into the directory their agent
    loads skills from.
+8. **Starter kits pin external skills to the registry.** A kit that installs a skill
+   from an external catalog must use that catalog's `sourceRef` and ask before
+   installing. Move the pin in the registry and the kit together.
 
 ## Before opening a PR
 

@@ -114,6 +114,31 @@ These are enforced by CI and by review:
   paths and full agent prompts. `.gitignore` blocks the known offenders; add new ones.
 - **No secrets, tokens, internal hostnames, or personal paths.** CI greps for these.
 
+## Adding a curated plugin
+
+A curated plugin offers a subset of `skills/` as its own installable plugin.
+
+1. Create `plugins/<name>/plugin.json` with `name` and a `version` matching the catalog.
+2. For each skill, add a relative symlink, never a copy:
+   `ln -s ../../../skills/<skill> plugins/<name>/skills/<skill>`
+3. Add an entry to `.github/plugin/marketplace.json` with
+   `"source": "./plugins/<name>"`, then copy it to `.claude-plugin/marketplace.json`.
+4. Add it to the README **Plugins** table.
+
+Listing skills in the marketplace entry alone does not work: when the source
+directory has a `plugin.json` (the repo root does), Copilot CLI ignores the
+entry's own `skills` list and installs everything. CI checks that every entry
+under `plugins/<name>/skills/` is a symlink to the same-named skill.
+
+## Adding a starter kit
+
+A starter kit is a project template under `starter-kits/<name>/`: a `README.md`
+plus a `template/` directory that users copy into a project. Enable plugins with
+`template/.github/copilot/settings.json`. To pull in a skill from an external
+catalog, register the catalog in `tools/external-catalogs.json` first, then
+install the skill by path at exactly its `sourceRef`, behind an explicit user
+confirmation. CI fails if a kit pins a registered catalog at any other commit.
+
 ## Adding an agent
 
 Add `agents/<name>.agent.md` with at minimum a `description` in frontmatter, then add
