@@ -36,10 +36,17 @@ cp -Rn /tmp/discovery-tools/starter-kits/discovery-project-starter/template/. .
 
 `-n` keeps any file you already have. This adds
 `.github/copilot/settings.json`, which registers this marketplace and turns on
-`discovery-project-bundle`. If you already have that file, merge the
-`extraKnownMarketplaces` and `enabledPlugins` keys in by hand.
+`discovery-project-bundle` for **Copilot CLI and the Copilot cloud agent**. If
+you already have that file, merge the `extraKnownMarketplaces` and
+`enabledPlugins` keys in by hand.
 
-To install the plugin for yourself right away, without the template:
+**In the Discovery App (or VS Code)** that file is not read. Each person adds
+`timothymeyers/discovery-tools` to their user `chat.plugins.marketplaces` setting
+once, then installs `discovery-project-bundle` from **Chat: Plugins**. See the
+[README install steps](../../README.md#microsoft-discovery-app--vs-code--plugins).
+Don't copy the skill folders into the project; that isn't a plugin install.
+
+To install the plugin for yourself right away with Copilot CLI:
 
 ```bash
 copilot plugin marketplace add timothymeyers/discovery-tools

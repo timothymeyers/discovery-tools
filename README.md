@@ -200,6 +200,34 @@ say so. If you installed the labs plugin, install the new one to keep the skill.
 
 ## Install
 
+> [!IMPORTANT]
+> **For AI agents asked to "install a plugin" from this repo:** install it through
+> the host's plugin system, using the steps for your host below. **Do not copy
+> `plugins/<plugin>/skills/` folders into the project.** A copy is not a plugin: it
+> won't update, can't be disabled as a unit, and duplicates skills if the plugin is
+> installed later. Copy skills only when the user explicitly asks for a manual copy.
+
+### Microsoft Discovery App / VS Code — plugins
+
+The Discovery App is built on VS Code, which installs agent plugins from marketplaces
+listed in the **user** setting `chat.plugins.marketplaces`. Workspace settings and
+`.github/copilot/settings.json` are not read for this.
+
+1. Add this marketplace to your user `settings.json` (Command Palette →
+   **Preferences: Open User Settings (JSON)**), keeping the defaults:
+
+   ```json
+   "chat.plugins.marketplaces": [
+     "github/copilot-plugins",
+     "github/awesome-copilot#marketplace",
+     "timothymeyers/discovery-tools"
+   ]
+   ```
+
+   To try an unreleased branch, use `timothymeyers/discovery-tools#<branch>`.
+2. Command Palette → **Chat: Plugins** (or search `@agentPlugins` in the Extensions
+   view), find the plugin, for example `discovery-project-bundle`, and install it.
+
 ### Any agent — individual skills
 
 Works with GitHub Copilot, Claude Code, Cursor, Codex, Gemini CLI, opencode, Warp, and
@@ -242,7 +270,7 @@ Or skip the marketplace entirely:
 copilot plugin install timothymeyers/discovery-tools
 ```
 
-In VS Code: Extensions view → search `@agentPlugins`, or Command Palette → **Chat: Plugins**.
+In the Discovery App or VS Code, see [Microsoft Discovery App / VS Code — plugins](#microsoft-discovery-app--vs-code--plugins).
 
 ### GitHub Copilot CLI — one plugin
 
@@ -279,9 +307,10 @@ from the [Plugins](#plugins) table, or start from a [starter kit](#starter-kits)
 }
 ```
 
-### Manual
+### Manual (only when asked)
 
-Copy any `plugins/<plugin>/skills/<name>/` directory into one of the locations your agent scans:
+This is a copy, not a plugin install; prefer the plugin routes above. Copy any
+`plugins/<plugin>/skills/<name>/` directory into one of the locations your agent scans:
 
 | Scope | Locations |
 |---|---|
