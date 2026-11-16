@@ -11,8 +11,7 @@ This repo is a catalog. It is simultaneously:
 
 Start with a [plugin](#plugins) or a [starter kit](#starter-kits). Each skill lives in
 exactly one plugin, at `plugins/<plugin>/skills/<skill>/`, and the `discovery-tools`
-plugin installs all of them. There is one physical copy of each skill: no symlinks, no
-duplication, no build step.
+plugin installs all of them.
 
 ---
 
