@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "discovery-tools",
-      "description": "Everything in the discovery-tools catalog for Microsoft Discovery, the AI for Science platform, in one install: the discovery-project-bundle plugin plus every labs plugin (discovery-tim-labs, discovery-cape-labs, life-sciences-labs, general-science-labs). Install a single plugin instead if you only need part of it.",
+      "description": "Everything in the discovery-tools catalog for Microsoft Discovery, the AI for Science platform, in one install: the discovery-project-bundle and discovery-flexible-setup plugins plus every labs plugin (discovery-tim-labs, discovery-cape-labs, life-sciences-labs, general-science-labs). Install a single plugin instead if you only need part of it.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
@@ -65,7 +65,11 @@
         "presentation",
         "html-presentation",
         "project-clarification",
-        "pre-flight"
+        "pre-flight",
+        "project-setup",
+        "outcomes",
+        "bookshelf",
+        "a2a"
       ],
       "source": {
         "source": "github",
@@ -74,7 +78,7 @@
     },
     {
       "name": "discovery-project-bundle",
-      "description": "Stable skills for running one Microsoft Discovery project: clarify the project before work starts, watch outcome grades and the task board, read engine runs as a chat, report token usage, and gather the project's exhaust (transcripts, logs, telemetry) into the project folder.",
+      "description": "Stable skills for running one Microsoft Discovery project: watch outcome grades and the task board, read engine runs as a chat, report token usage, and gather the project's exhaust (transcripts, logs, telemetry) into the project folder.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
@@ -90,10 +94,35 @@
         "observability",
         "token-usage",
         "engine-chat",
-        "exhaust",
-        "pre-flight"
+        "exhaust"
       ],
       "source": "./plugins/discovery-project-bundle"
+    },
+    {
+      "name": "discovery-flexible-setup",
+      "description": "Set up or re-plan a Microsoft Discovery project with a propose-then-apply workflow: Purpose, data intake into Bookshelf and data/, Outcomes with draft rubrics, task breakdown, and agents/skills/tools/A2A agents. Starts from a grant or proposal or walks through step by step; never deletes and keeps a git ledger. Includes pre-flight clarification and agent deployment from microsoft/discovery.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-flexible-setup",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "microsoft-discovery",
+        "project-setup",
+        "pre-flight",
+        "outcomes",
+        "rubrics",
+        "bookshelf",
+        "data-intake",
+        "task-breakdown",
+        "discovery-agents",
+        "mcp",
+        "a2a"
+      ],
+      "source": "./plugins/discovery-flexible-setup"
     },
     {
       "name": "discovery-tim-labs",
@@ -118,7 +147,7 @@
     },
     {
       "name": "discovery-cape-labs",
-      "description": "Microsoft Discovery agent and task-design skills: add agents from microsoft/discovery and deploy them locally or to a Discovery project, and generate task designs using the Deterministic, Guided Exploration, and Autonomous Research patterns.",
+      "description": "Microsoft Discovery task-design skill: generate task designs using the Deterministic, Guided Exploration, and Autonomous Research investigation patterns, and create them as local or cloud tasks.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
@@ -130,8 +159,6 @@
       "keywords": [
         "microsoft-discovery",
         "labs",
-        "discovery-agents",
-        "foundry",
         "investigation-tasks",
         "task-design"
       ],

@@ -1,0 +1,25 @@
+{
+  "name": "discovery-flexible-setup",
+  "version": "0.9.0",
+  "description": "Set up or re-plan a Microsoft Discovery project with a propose-then-apply workflow: Purpose, data intake into Bookshelf and data/, Outcomes with draft rubrics, task breakdown, and agents/skills/tools/A2A agents. Starts from a grant or proposal or walks through step by step; never deletes and keeps a git ledger. Includes pre-flight clarification and agent deployment from microsoft/discovery.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-flexible-setup",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "microsoft-discovery",
+    "project-setup",
+    "pre-flight",
+    "outcomes",
+    "rubrics",
+    "bookshelf",
+    "data-intake",
+    "task-breakdown",
+    "discovery-agents",
+    "mcp",
+    "a2a"
+  ]
+}

@@ -11,7 +11,7 @@ browsing.
 
 | Plugin | Skills |
 |---|---|
-| [`discovery-project-bundle`](../../plugins/discovery-project-bundle) | `discovery-clarify-project`, `discovery-status-board`, `engine-chat-experimental`, `discovery-token-usage`, `discovery-gather-exhaust` |
+| [`discovery-project-bundle`](../../plugins/discovery-project-bundle) | `discovery-status-board`, `engine-chat-experimental`, `discovery-token-usage`, `discovery-gather-exhaust` |
 
 **Upstream catalogs to browse.** The kit installs nothing from them:
 

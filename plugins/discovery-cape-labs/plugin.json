@@ -1,7 +1,7 @@
 {
   "name": "discovery-cape-labs",
   "version": "0.9.0",
-  "description": "Microsoft Discovery agent and task-design skills: add agents from microsoft/discovery and deploy them locally or to a Discovery project, and generate task designs using the Deterministic, Guided Exploration, and Autonomous Research patterns.",
+  "description": "Microsoft Discovery task-design skill: generate task designs using the Deterministic, Guided Exploration, and Autonomous Research investigation patterns, and create them as local or cloud tasks.",
   "author": {
     "name": "Tim Meyers",
     "url": "https://github.com/timothymeyers"
@@ -12,8 +12,6 @@
   "keywords": [
     "microsoft-discovery",
     "labs",
-    "discovery-agents",
-    "foundry",
     "investigation-tasks",
     "task-design"
   ]

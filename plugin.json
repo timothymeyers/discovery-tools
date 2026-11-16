@@ -1,7 +1,7 @@
 {
   "name": "discovery-tools",
   "version": "0.9.0",
-  "description": "Everything in the discovery-tools catalog for Microsoft Discovery, the AI for Science platform, in one install: the discovery-project-bundle plugin plus every labs plugin (discovery-tim-labs, discovery-cape-labs, life-sciences-labs, general-science-labs). Install a single plugin instead if you only need part of it.",
+  "description": "Everything in the discovery-tools catalog for Microsoft Discovery, the AI for Science platform, in one install: the discovery-project-bundle and discovery-flexible-setup plugins plus every labs plugin (discovery-tim-labs, discovery-cape-labs, life-sciences-labs, general-science-labs). Install a single plugin instead if you only need part of it.",
   "author": {
     "name": "Tim Meyers",
     "url": "https://github.com/timothymeyers"
@@ -54,10 +54,15 @@
     "presentation",
     "html-presentation",
     "project-clarification",
-    "pre-flight"
+    "pre-flight",
+    "project-setup",
+    "outcomes",
+    "bookshelf",
+    "a2a"
   ],
   "skills": [
     "plugins/discovery-project-bundle/skills/",
+    "plugins/discovery-flexible-setup/skills/",
     "plugins/discovery-tim-labs/skills/",
     "plugins/discovery-cape-labs/skills/",
     "plugins/life-sciences-labs/skills/",

@@ -4,7 +4,6 @@ The stable set of skills for running one Microsoft Discovery project.
 
 | Skill | What it does |
 |---|---|
-| [`discovery-clarify-project`](skills/discovery-clarify-project) | Before work starts: asks up to 5 clarifying questions about the project's purpose, outcomes, and tasks |
 | [`discovery-status-board`](skills/discovery-status-board) | Outcome grades as red/yellow/green chips, plus a task kanban |
 | [`engine-chat-experimental`](skills/engine-chat-experimental) | Read engine runs as a chat *(experimental)* |
 | [`discovery-token-usage`](skills/discovery-token-usage) | Token usage across engines, models, and chat |

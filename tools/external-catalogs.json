@@ -201,7 +201,7 @@
       "overlaps": [
         {
           "upstream": "skills/add-example-agents",
-          "local": "plugins/discovery-cape-labs/skills/discovery-add-agents",
+          "local": "plugins/discovery-flexible-setup/skills/discovery-add-agents",
           "notes": "Same skill at 1.16.0. The local copy replaces upstream's internal registry name with a <your-acr> placeholder and adds catalog metadata; prefer it for now. Candidate for retirement in favor of upstream."
         },
         {

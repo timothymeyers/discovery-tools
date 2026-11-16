@@ -1,10 +1,9 @@
 # discovery-cape-labs
 
-Agent and task-design skills for Microsoft Discovery. Both overlap with skills in [microsoft/discovery](https://github.com/microsoft/discovery) and may be retired in favor of upstream later.
+Task design for Microsoft Discovery. `discovery-design-tasks` overlaps with a skill in [microsoft/discovery](https://github.com/microsoft/discovery) and may be retired in favor of upstream later. `discovery-flexible-setup` calls it for its task-breakdown step.
 
 | Skill | What it does |
 |---|---|
-| [`discovery-add-agents`](skills/discovery-add-agents) | Add agents from microsoft/discovery and deploy them locally or to a Discovery project |
 | [`discovery-design-tasks`](skills/discovery-design-tasks) | Write a task design using the Deterministic, Guided Exploration, or Autonomous Research pattern |
 
 ```bash
