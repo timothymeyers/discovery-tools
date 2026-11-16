@@ -38,9 +38,14 @@ Status: pending        # pending | approved | partial | applied | rejected
 
 ## Tasks
 - [ ] T1 CREATE root "…"
+  - validation: …
 - [ ] T2 CREATE milestone "…" parent=T1 link=O1
-- [ ] T3 CREATE leaf "…" parent=T2 deps=[] labels=[access-pending]
-  - acceptance: …
+  - validation: … (from O1's rubric)
+- [ ] T3 CREATE leaf "…" parent=T2 deps=[] labels=[pattern:guided, access-pending]
+  - validation: …
+- [ ] T4 CREATE pause "Human review: …" parent=T2 deps=[T3] labels=[hitl-pause, hitl:cost] assign=user
+  - validation: decision recorded as a comment with approver and date
+  - why: …
 - [ ] T9 REMOVE <id> "…"   reason: …
 
 ## Tools / agents / skills   (Step 5 proposals only)

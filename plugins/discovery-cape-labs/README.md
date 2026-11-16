@@ -1,6 +1,6 @@
 # discovery-cape-labs
 
-Task design for Microsoft Discovery. `discovery-design-tasks` overlaps with a skill in [microsoft/discovery](https://github.com/microsoft/discovery) and may be retired in favor of upstream later. `discovery-flexible-setup` calls it for its task-breakdown step.
+Task design for Microsoft Discovery. `discovery-design-tasks` overlaps with a skill in [microsoft/discovery](https://github.com/microsoft/discovery) and may be retired in favor of upstream later. `discovery-flexible-setup` offers it after agents are installed, to design one milestone in detail.
 
 | Skill | What it does |
 |---|---|

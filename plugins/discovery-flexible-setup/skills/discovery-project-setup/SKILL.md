@@ -15,7 +15,7 @@ description: |
   USE FOR: executing tasks, grading outcomes, or a single narrow change
   that a sub-skill handles alone (discovery-define-outcomes,
   discovery-curate-bookshelf, discovery-provision-tools,
-  discovery-design-tasks).
+  discovery-work-breakdown).
 metadata:
   version: "0.1.0"
   category: "Cross-domain"
@@ -105,12 +105,19 @@ Optional pre-flight: after Step 3, offer `discovery-clarify-project`
 (read its SKILL.md; deliver its questions as plain chat, not a modal).
 
 ### Step 4 — Task breakdown
-Use `discovery-design-tasks` (read its SKILL.md) with the approved Purpose,
-Outcomes, and data inventory as input. Convert its design into proposal ops
-per [references/proposal-format.md](references/proposal-format.md):
-root -> milestone per outcome -> leaf tasks with acceptance criteria and
-dependencies; `outcome.link-task` for every milestone; tasks needing an
-external source without access are labelled `access-pending`.
+Use the `discovery-work-breakdown` skill in proposal-only mode, with the
+approved Purpose, Outcomes (and rubrics), existing tasks, and data inventory
+as input. It returns root -> milestone per outcome -> as many leaf tasks as
+the work needs, with validation requirements on every task, dependencies,
+`outcome.link-task` for every milestone, suggested execution patterns,
+human-in-the-loop pause tasks before safety-critical or high-cost steps, and
+compute chains where the goals need HPC or cloud. Tasks needing an external
+source without access are labelled `access-pending`. Show its tree in chat
+and iterate until the user approves.
+
+To design one milestone in detail as an investigation for a specific agent
+set, offer `discovery-design-tasks` (in `discovery-cape-labs`) after Step 5,
+once agents are installed.
 
 ### Step 5 — Agents, skills, tools
 Use the `discovery-provision-tools` skill. It handles user-supplied sources
@@ -120,8 +127,9 @@ timothymeyers/discovery-tools, and any extra catalog repos the user names).
 Recommendations must trace to a task or an `access-pending` gap.
 
 ### Step 6 — Assign and finalize
-Proposal: assign installed agents to leaf tasks; clear `access-pending`
-labels whose gap is closed; mark engine-eligible tasks. Then apply, verify
+Proposal: assign installed agents to leaf tasks (pause tasks stay assigned
+to the user); clear `access-pending` labels whose gap is closed; mark
+engine-eligible tasks. Then apply, verify
 ([references/apply.md](references/apply.md)), commit, and present next
 steps:
 - "Show me my ready tasks" to work interactively.

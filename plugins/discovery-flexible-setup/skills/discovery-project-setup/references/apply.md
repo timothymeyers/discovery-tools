@@ -11,8 +11,11 @@
    - Outcomes: `purpose outcome.create` / `outcome.update`, then `rubric.generate`.
      Use `rubric.create` when the proposal includes explicit questions.
    - Links: `purpose outcome.link-task`.
-   - Tasks: `tasks create` (with `parentId`, `acceptanceCriteria`, `labels`),
-     `addDependency`, `transition status=removed` (with a comment), and `assign`.
+   - Tasks: `tasks create` (with `parentId`, `acceptanceCriteria` for every
+     task's validation requirements, which Discovery stores as
+     `validationRequirements`, and `labels`), `addDependency` on the dependent
+     task (never on a parent), `transition status=removed` (with a comment),
+     and `assign`.
    - Bookshelf: `bookshelf` create, then ingest.
    - Data: copy files, then update `data/README.md` and `data/external-sources.md`.
 5. **Failures**: don't stop silently. Mark the op `FAILED: <error>` in

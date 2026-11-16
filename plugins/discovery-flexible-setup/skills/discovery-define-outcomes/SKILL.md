@@ -10,7 +10,7 @@ description: |
   outcome', 'these outcomes are vague', 'replace outcome X', 'generate
   rubrics for my outcomes'. DO NOT USE FOR: grading outcomes (use the
   purpose tool grade.*), full project setup (use discovery-project-setup),
-  or task planning (use discovery-design-tasks).
+  or task planning (use discovery-work-breakdown).
 metadata:
   version: "0.1.0"
   category: "Cross-domain"

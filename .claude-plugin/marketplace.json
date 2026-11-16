@@ -100,7 +100,7 @@
     },
     {
       "name": "discovery-flexible-setup",
-      "description": "Set up or re-plan a Microsoft Discovery project with a propose-then-apply workflow: Purpose, data intake into Bookshelf and data/, Outcomes with draft rubrics, task breakdown, and agents/skills/tools/A2A agents. Starts from a grant or proposal or walks through step by step; never deletes and keeps a git ledger. Includes pre-flight clarification and agent deployment from microsoft/discovery.",
+      "description": "Set up or re-plan a Microsoft Discovery project with a propose-then-apply workflow: Purpose, data intake into Bookshelf and data/, Outcomes with draft rubrics, task breakdown with human-in-the-loop pauses and compute plans, and agents/skills/tools/A2A agents. Starts from a grant or proposal or walks through step by step; never deletes and keeps a git ledger. Includes pre-flight clarification and agent deployment from microsoft/discovery.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
@@ -120,7 +120,9 @@
         "task-breakdown",
         "discovery-agents",
         "mcp",
-        "a2a"
+        "a2a",
+        "work-breakdown",
+        "human-in-the-loop"
       ],
       "source": "./plugins/discovery-flexible-setup"
     },
