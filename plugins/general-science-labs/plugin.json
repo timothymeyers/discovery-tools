@@ -1,0 +1,22 @@
+{
+  "name": "general-science-labs",
+  "version": "0.9.0",
+  "description": "Cross-domain science skills: establish an authorized, versioned route to a scientific database, build an auditable evidence and QC layer over merged database evidence, and search DOE literature on OSTI.GOV via the external osti-axi CLI.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/general-science-labs",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "ai-for-science",
+    "labs",
+    "scientific-databases",
+    "data-provenance",
+    "reproducibility",
+    "evidence-qc",
+    "osti",
+    "literature-search"
+  ]
+}

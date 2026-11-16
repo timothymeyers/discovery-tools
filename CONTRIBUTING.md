@@ -2,7 +2,10 @@
 
 ## Adding a skill
 
-1. Create `skills/<name>/SKILL.md`. The directory name and the frontmatter `name` **must
+1. Pick the plugin it belongs to (see the README **Plugins** table). New, unproven
+   skills usually start in a labs plugin. Create
+   `plugins/<plugin>/skills/<name>/SKILL.md`. A skill lives in exactly one plugin;
+   CI fails on a second copy or a symlink. The directory name and the frontmatter `name` **must
    match**, and both must be lowercase `a-z0-9` plus hyphens (1–64 chars, no leading or
    trailing hyphen, no `--`).
 
@@ -84,7 +87,7 @@
 
 5. **Dependencies must be declared and documented.** `gh skill install` and plugin
    install do **not** install Python packages. If a skill needs third-party packages at
-   runtime, add `skills/<name>/requirements.txt` and a short `## Dependencies` section in
+   runtime, add `plugins/<plugin>/skills/<name>/requirements.txt` and a short `## Dependencies` section in
    `SKILL.md` telling the user to install it — otherwise a standalone install fails at
    first real use. Test-only dependencies belong in the repo-root `requirements-dev.txt`.
 
@@ -97,8 +100,12 @@
 7. Keep `SKILL.md` under ~500 lines. Agents load only `name` + `description` at startup
    and read the body on demand, so put detail in `references/` rather than inline.
 
-8. **Add your skill to the README skills table**, in the section for its category. CI
-   fails if a skill is missing from the README or if a category has no section.
+8. **Add your skill to the README skills table**, in the section for its category,
+   linked to `plugins/<plugin>/skills/<name>`, and to its plugin's README. CI fails if
+   a skill is missing from the README or if a category has no section.
+
+No manifest edit is needed: a plugin loads everything in its `skills/` directory,
+and the root `plugin.json` already lists every plugin's `skills/` directory.
 
 ## Rules for skill payloads
 
@@ -107,37 +114,51 @@ These are enforced by CI and by review:
 - **Never hardcode an install path.** A skill may be installed as a personal skill
   (`~/.copilot/skills/`), a project skill (`.github/skills/`), or as part of a plugin
   (`~/.copilot/installed-plugins/`). Resolve script locations at runtime — see
-  `skills/discovery-token-usage/SKILL.md` for the pattern.
+  `plugins/discovery-project-bundle/skills/discovery-token-usage/SKILL.md` for the pattern.
 - **Never write into the skill's own directory.** It may be read-only. Default any
   generated output to the current working directory or an explicit `--output` flag.
 - **Never commit generated output.** Mined artifacts routinely contain absolute local
   paths and full agent prompts. `.gitignore` blocks the known offenders; add new ones.
 - **No secrets, tokens, internal hostnames, or personal paths.** CI greps for these.
 
-## Adding a curated plugin
+## Adding a plugin
 
-A curated plugin offers a subset of `skills/` as its own installable plugin.
+Plugins can't depend on each other, so each skill lives in exactly one plugin
+and starter kits combine them.
 
-1. Create `plugins/<name>/plugin.json` with `name` and a `version` matching the catalog.
-2. For each skill, add a relative symlink, never a copy:
-   `ln -s ../../../skills/<skill> plugins/<name>/skills/<skill>`
-3. Add an entry to `.github/plugin/marketplace.json` with
+1. Create `plugins/<name>/plugin.json` with `name` and a `version` matching the catalog,
+   plus `plugins/<name>/README.md` and `plugins/<name>/skills/`.
+2. Move skills in with `git mv`. Never copy or symlink.
+3. Add `plugins/<name>/skills/` to the `skills` list in the root `plugin.json`, so
+   the `discovery-tools` plugin still installs everything.
+4. Add an entry to `.github/plugin/marketplace.json` with
    `"source": "./plugins/<name>"`, then copy it to `.claude-plugin/marketplace.json`.
-4. Add it to the README **Plugins** table.
+5. Add it to the README **Plugins** table, and update the **Plugin** column of the
+   skills table.
 
-Listing skills in the marketplace entry alone does not work: when the source
-directory has a `plugin.json` (the repo root does), Copilot CLI ignores the
-entry's own `skills` list and installs everything. CI checks that every entry
-under `plugins/<name>/skills/` is a symlink to the same-named skill.
+CI checks every one of these.
+
+## Promoting or retiring a skill
+
+- **Promote** a labs skill by moving its directory to the stable plugin with
+  `git mv`, updating both plugin READMEs and the README tables, and saying so in
+  the release notes. People who installed the labs plugin lose the skill there.
+- **Retire** a skill whose canonical version now lives upstream by deleting it,
+  adding a row to the README **Retired skills** table that points to the upstream
+  copy at its pinned ref, and updating the external-catalog registry's `overlaps`.
 
 ## Adding a starter kit
 
 A starter kit is a project template under `starter-kits/<name>/`: a `README.md`
-plus a `template/` directory that users copy into a project. Enable plugins with
-`template/.github/copilot/settings.json`. To pull in a skill from an external
-catalog, register the catalog in `tools/external-catalogs.json` first, then
-install the skill by path at exactly its `sourceRef`, behind an explicit user
-confirmation. CI fails if a kit pins a registered catalog at any other commit.
+plus a `template/` directory that users copy into a project. Turn plugins on with
+`template/.github/copilot/settings.json` (`enabledPlugins` as a map of
+`plugin@marketplace` to `true`). CI checks that every plugin it turns on exists.
+
+A kit may point to an external catalog. Register the catalog in
+`tools/external-catalogs.json` first, and link it at exactly its `sourceRef`. CI
+fails if a kit pins a registered catalog at any other commit. Kits don't ship
+install scripts for upstream skills; once a catalog publishes a
+`marketplace.json`, register it in the kit's `settings.json` instead.
 
 ## Adding an agent
 

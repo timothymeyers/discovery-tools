@@ -145,7 +145,13 @@
         "scope": "metadata-only"
       },
       "licenseNotes": "The repository root is BSD-2-Clause, but the root LICENSE is NOT authoritative for the whole tree. Upstream's NOTICE states that where a subdirectory carries its own LICENSE, that file supersedes the root for that subtree and its descendants. At the pinned ref: skills/academy, skills/baseeval-skills, skills/hpc-skills, and skills/literature-search each ship an Apache-2.0 LICENSE; the amsc-data-movement-api skill declares MIT in its SKILL.md frontmatter with no other licensing information for that subtree; and skills/basedata-skills had NO explicit license at the time of inclusion. Determine the license of the specific skill you intend to adopt by reading the pinned NOTICE and the nearest LICENSE above that skill. Do not rely on the root license.",
-      "rootLicense": "BSD-2-Clause"
+      "rootLicense": "BSD-2-Clause",
+      "usedBy": [
+        {
+          "kit": "starter-kits/discovery-project-starter",
+          "how": "Listed in the kit README as a catalog to browse, linked at the pinned ref. The kit installs nothing from it."
+        }
+      ]
     },
     {
       "name": "microsoft-discovery",
@@ -183,32 +189,30 @@
       "sourceRefType": "commit",
       "sourceRefNotes": [
         "`main` HEAD as of 2026-11-13. Upstream has no release tags, so a commit SHA is the only immutable locator.",
-        "The discovery-project-kit starter kit installs token-estimator-mvp at exactly this ref; CI fails if the kit's pin and this sourceRef drift."
+        "The discovery-project-starter kit links this catalog at exactly this ref; CI fails if a kit pins any other commit."
       ],
       "documentation": "https://github.com/microsoft/discovery/blob/d424c9e7e6b769fdfdbe0c63bea4ad8ff7a82ecf/README.md",
       "usedBy": [
         {
-          "kit": "starter-kits/discovery-project-kit",
-          "skill": "token-estimator-mvp",
-          "path": "skills/token-estimator-mvp",
-          "runtime": "Node.js (no dependencies)"
+          "kit": "starter-kits/discovery-project-starter",
+          "how": "Listed in the kit README as a catalog to browse, linked at the pinned ref. The kit installs nothing from it."
         }
       ],
       "overlaps": [
         {
           "upstream": "skills/add-example-agents",
-          "local": "skills/discovery-add-agents",
-          "notes": "Same skill at 1.16.0. The local copy replaces upstream's internal registry name with a <your-acr> placeholder and adds catalog metadata; prefer it."
+          "local": "plugins/discovery-cape-labs/skills/discovery-add-agents",
+          "notes": "Same skill at 1.16.0. The local copy replaces upstream's internal registry name with a <your-acr> placeholder and adds catalog metadata; prefer it for now. Candidate for retirement in favor of upstream."
         },
         {
           "upstream": "skills/build-research-paper",
-          "local": "skills/build-research-paper",
-          "notes": "Same skill at version 2 with small wording differences; prefer the local copy."
+          "retiredLocal": "skills/build-research-paper",
+          "notes": "Upstream is canonical. This catalog retired its copy in 0.9.0; install upstream's at the pinned ref."
         },
         {
           "upstream": ".github/skills/discovery-design-tasks",
-          "local": "skills/discovery-design-tasks",
-          "notes": "Same purpose; prefer the local copy."
+          "local": "plugins/discovery-cape-labs/skills/discovery-design-tasks",
+          "notes": "Same purpose; prefer the local copy for now. Candidate for retirement in favor of upstream."
         }
       ],
       "safety": {

@@ -1,0 +1,20 @@
+{
+  "name": "discovery-tim-labs",
+  "version": "0.9.0",
+  "description": "Experimental Microsoft Discovery skills that are still being tried out: a live operations dashboard, a project-story HTML replay, and a chat-session finder and viewer. Skills graduate to a stable plugin once proven useful.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-tim-labs",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "microsoft-discovery",
+    "labs",
+    "experimental",
+    "dashboard",
+    "storytelling",
+    "chat-sessions"
+  ]
+}

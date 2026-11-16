@@ -6,11 +6,10 @@ repo-level context.)
 ## What this repo is
 
 A public catalog of agent skills, custom agents, and starter kits for Microsoft Discovery.
-The plugin root is the repo root, so `skills/` serves double duty: it is both the Agent
-Skills distribution convention (`gh skill install`) and the plugin component location
-(`copilot plugin install`). Do not move it, and do not create a second copy of any skill.
-Curated plugins under `plugins/<name>/` offer a subset by symlinking into `skills/`;
-add skills to them with `ln -s`, never `cp`. CI enforces this.
+Each skill lives in exactly one plugin, at `plugins/<plugin>/skills/<skill>/`. The root
+`plugin.json` is the `discovery-tools` plugin and lists every plugin's `skills/` directory.
+Plugins can't depend on each other; starter kits combine them through `settings.json`.
+Never copy or symlink a skill into a second plugin; move it with `git mv`. CI enforces this.
 
 ## Hard rules
 
@@ -33,9 +32,9 @@ add skills to them with `ln -s`, never `cp`. CI enforces this.
    Never run an external catalog's installer (e.g. an `unpack.sh`) on a user's
    behalf without explicit consent — it writes into the directory their agent
    loads skills from.
-8. **Starter kits pin external skills to the registry.** A kit that installs a skill
-   from an external catalog must use that catalog's `sourceRef` and ask before
-   installing. Move the pin in the registry and the kit together.
+8. **Starter kits pin external catalogs to the registry.** A kit that links an
+   external catalog must use that catalog's `sourceRef`, and kits ship no install
+   scripts for upstream skills. Move the pin in the registry and the kit together.
 
 ## Before opening a PR
 
@@ -45,5 +44,6 @@ python3 .github/scripts/validate.py
 
 ## Version bumps
 
-`plugin.json`, `.github/plugin/marketplace.json`, and `.claude-plugin/marketplace.json`
-all carry a `version`. They move together with the git tag.
+The root `plugin.json`, every `plugins/*/plugin.json`, `.github/plugin/marketplace.json`,
+and `.claude-plugin/marketplace.json` all carry a `version`. They move together with the
+git tag.

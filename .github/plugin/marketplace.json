@@ -5,13 +5,13 @@
     "url": "https://github.com/timothymeyers"
   },
   "metadata": {
-    "description": "Agents, skills, and starter kits for Microsoft Discovery (AI for Science), categorized by scientific domain",
+    "description": "Plugins for Microsoft Discovery (AI for Science): a stable project bundle, labs plugins for skills still being proven, and an everything plugin",
     "version": "0.9.0"
   },
   "plugins": [
     {
       "name": "discovery-tools",
-      "description": "Agents, skills, and starter kits for Microsoft Discovery \u2014 the AI for Science platform. Life-sciences data skills for SABIO-RK, BRENDA, BioCyc/EcoCyc/CyanoCyc, AlphaFold DB, and Rhea/ChEBI/MetaNetX/UniProt identifier crosswalks, plus cross-domain skills for scientific database access, evidence QC, Discovery agent deployment, project pre-flight clarification, and task design, workspace token-usage mining, live project dashboards, evidence-true project story replays, arxiv-ready paper builds, and DOE literature retrieval. Every skill declares its scientific category and subfield.",
+      "description": "Everything in the discovery-tools catalog for Microsoft Discovery, the AI for Science platform, in one install: the discovery-project-bundle plugin plus every labs plugin (discovery-tim-labs, discovery-cape-labs, life-sciences-labs, general-science-labs). Install a single plugin instead if you only need part of it.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
@@ -28,9 +28,6 @@
         "observability",
         "agent-skills",
         "copilot-cli",
-        "research-paper",
-        "latex",
-        "arxiv",
         "osti",
         "scientific-literature",
         "literature-search",
@@ -66,7 +63,9 @@
         "storytelling",
         "retrospective",
         "presentation",
-        "html-presentation"
+        "html-presentation",
+        "project-clarification",
+        "pre-flight"
       ],
       "source": {
         "source": "github",
@@ -74,27 +73,121 @@
       }
     },
     {
-      "name": "discovery-project-kit",
-      "description": "Curated subset of discovery-tools for running a Microsoft Discovery project: deploy catalog agents, watch outcomes and engine runs, keep the project's records (exhaust and token usage), and write it up as a paper. Pair with the discovery-project-kit starter kit to add the pinned upstream token estimator.",
+      "name": "discovery-project-bundle",
+      "description": "Stable skills for running one Microsoft Discovery project: clarify the project before work starts, watch outcome grades and the task board, read engine runs as a chat, report token usage, and gather the project's exhaust (transcripts, logs, telemetry) into the project folder.",
       "version": "0.9.0",
       "author": {
         "name": "Tim Meyers",
         "url": "https://github.com/timothymeyers"
       },
-      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-project-kit",
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-project-bundle",
       "repository": "https://github.com/timothymeyers/discovery-tools",
       "license": "MIT",
       "keywords": [
         "microsoft-discovery",
         "ai-for-science",
-        "starter-kit",
-        "observability",
         "project-status",
+        "observability",
         "token-usage",
-        "discovery-agents",
-        "research-paper"
+        "engine-chat",
+        "exhaust",
+        "pre-flight"
       ],
-      "source": "./plugins/discovery-project-kit"
+      "source": "./plugins/discovery-project-bundle"
+    },
+    {
+      "name": "discovery-tim-labs",
+      "description": "Experimental Microsoft Discovery skills that are still being tried out: a live operations dashboard, a project-story HTML replay, and a chat-session finder and viewer. Skills graduate to a stable plugin once proven useful.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-tim-labs",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "microsoft-discovery",
+        "labs",
+        "experimental",
+        "dashboard",
+        "storytelling",
+        "chat-sessions"
+      ],
+      "source": "./plugins/discovery-tim-labs"
+    },
+    {
+      "name": "discovery-cape-labs",
+      "description": "Microsoft Discovery agent and task-design skills: add agents from microsoft/discovery and deploy them locally or to a Discovery project, and generate task designs using the Deterministic, Guided Exploration, and Autonomous Research patterns.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-cape-labs",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "microsoft-discovery",
+        "labs",
+        "discovery-agents",
+        "foundry",
+        "investigation-tasks",
+        "task-design"
+      ],
+      "source": "./plugins/discovery-cape-labs"
+    },
+    {
+      "name": "life-sciences-labs",
+      "description": "Life-sciences data skills for Microsoft Discovery projects: SABIO-RK kinetics, licensed BRENDA ingestion, BioCyc/EcoCyc/CyanoCyc network context, version-aware AlphaFold DB retrieval, and Rhea/ChEBI/MetaNetX/UniProt identifier crosswalks.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/life-sciences-labs",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "life-sciences",
+        "labs",
+        "enzymology",
+        "systems-biology",
+        "structural-biology",
+        "bioinformatics",
+        "sabio-rk",
+        "brenda",
+        "biocyc",
+        "alphafold",
+        "uniprot",
+        "chebi",
+        "rhea",
+        "metanetx"
+      ],
+      "source": "./plugins/life-sciences-labs"
+    },
+    {
+      "name": "general-science-labs",
+      "description": "Cross-domain science skills: establish an authorized, versioned route to a scientific database, build an auditable evidence and QC layer over merged database evidence, and search DOE literature on OSTI.GOV via the external osti-axi CLI.",
+      "version": "0.9.0",
+      "author": {
+        "name": "Tim Meyers",
+        "url": "https://github.com/timothymeyers"
+      },
+      "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/general-science-labs",
+      "repository": "https://github.com/timothymeyers/discovery-tools",
+      "license": "MIT",
+      "keywords": [
+        "ai-for-science",
+        "labs",
+        "scientific-databases",
+        "data-provenance",
+        "reproducibility",
+        "evidence-qc",
+        "osti",
+        "literature-search"
+      ],
+      "source": "./plugins/general-science-labs"
     }
   ]
 }

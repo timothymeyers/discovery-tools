@@ -4,15 +4,12 @@ Project templates for getting a Microsoft Discovery project off the ground.
 
 | Kit | What it sets up |
 |---|---|
-| [`discovery-project-kit`](discovery-project-kit) | Enables the `discovery-project-kit` plugin (six project-operations skills) and optionally installs the pinned upstream `token-estimator-mvp` skill from microsoft/discovery |
+| [`discovery-project-starter`](discovery-project-starter) | Turns on the `discovery-project-bundle` plugin for the project, and points to the microsoft/discovery and genesis-skills catalogs at their pinned commits |
 
-Starter kits are **not** plugin components — they are project templates, so they are
-not installed by `copilot plugin install` or `gh skill install`. Copy a kit's
-`template/` directory into your project; its README says how.
-
-Each kit should ship a `template/.github/copilot/settings.json` that registers this
-catalog and enables the plugin it needs, so everyone who opens the project gets the
-skills:
+Plugins can't depend on other plugins, so a starter kit is how plugins are
+combined: its `template/.github/copilot/settings.json` registers this
+marketplace and turns on the plugins the project needs. Everyone who opens the
+project gets them.
 
 ```json
 {
@@ -21,10 +18,14 @@ skills:
       "source": { "source": "github", "repo": "timothymeyers/discovery-tools" }
     }
   },
-  "enabledPlugins": { "discovery-project-kit@discovery-tools": true }
+  "enabledPlugins": { "discovery-project-bundle@discovery-tools": true }
 }
 ```
 
-A kit that installs skills from an external catalog must pin them to that catalog's
-`sourceRef` in [`tools/external-catalogs.json`](../tools/external-catalogs.json) and
-ask before installing. CI fails if the two drift.
+Starter kits are **not** plugin components, so `copilot plugin install` and
+`gh skill install` don't install them. Copy a kit's `template/` directory into
+your project; its README says how.
+
+CI checks that every kit has a README and a `settings.json`, that each plugin it
+turns on exists in this marketplace, and that any commit it pins for an external
+catalog matches [`tools/external-catalogs.json`](../tools/external-catalogs.json).
