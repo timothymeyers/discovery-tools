@@ -78,6 +78,9 @@ warnings = []
 # skill name -> metadata.category, populated by check_skill()
 SKILL_CATEGORIES = {}
 
+# skill name -> repo-relative skill directory, populated by discover_skills()
+SKILL_DIRS = {}
+
 
 def err(msg):
     errors.append(msg)
@@ -334,9 +337,23 @@ def check_manifests():
         # publishing defect, not a style nit.
         err(f"version fields are out of sync across manifests: {sorted(versions)}")
 
-    for s in pj.get("skills", []):
+    # The root plugin is the "everything" plugin: it must list every plugin's
+    # skills/ directory, and nothing else, or it silently drops a plugin.
+    declared = pj.get("skills", [])
+    if isinstance(declared, str):
+        declared = [declared]
+    for s in declared:
         if not os.path.isdir(os.path.join(ROOT, s.rstrip("/"))):
             err(f"plugin.json: declared skills path {s!r} does not exist")
+    expected = {f"plugins/{p}/skills" for p in plugin_dirs()}
+    got = {os.path.normpath(s) for s in declared}
+    if got != expected:
+        missing, extra = sorted(expected - got), sorted(got - expected)
+        err(
+            f"plugin.json: 'skills' must list exactly every plugins/<name>/skills/ "
+            f"directory so the discovery-tools plugin installs everything. "
+            f"Missing: {missing or '-'}; unexpected: {extra or '-'}"
+        )
 
     if "agents" in pj:
         ad = os.path.join(ROOT, pj["agents"].rstrip("/"))
@@ -346,7 +363,194 @@ def check_manifests():
         if not has_agents:
             err(f"plugin.json: declares agents at {pj['agents']!r} but none were found")
 
+    listed = set()
+    for entry in a.get("plugins", []):
+        if check_plugin_entry(entry, versions):
+            listed.add(entry.get("name"))
+    for p in plugin_dirs():
+        if p not in listed:
+            err(f"plugins/{p}: has no entry in .github/plugin/marketplace.json")
+
     print("manifests OK")
+
+
+def check_plugin_entry(entry, versions):
+    """Lint a marketplace entry that points at a plugin under plugins/.
+
+    Every skill lives in exactly one plugins/<name>/skills/ directory, as a real
+    directory. Plugins cannot depend on each other, so the root plugin.json is
+    the "everything" plugin and lists all of them. Returns True when the entry
+    is a local plugins/ entry.
+    """
+    name = entry.get("name", "<unnamed>")
+    source = entry.get("source")
+    if not isinstance(source, str) or source.rstrip("/") in (".", ""):
+        return False
+    rel = os.path.normpath(source)
+    pdir = os.path.join(ROOT, rel)
+    if not os.path.isdir(pdir):
+        err(f"marketplace.json: plugin {name!r} source {source!r} does not exist")
+        return False
+    if rel != os.path.join("plugins", name):
+        err(f"marketplace.json: plugin {name!r} source must be ./plugins/{name}, got {source!r}")
+
+    manifest = os.path.join(pdir, "plugin.json")
+    if not os.path.isfile(manifest):
+        err(f"{rel}: missing plugin.json")
+        return True
+    try:
+        pj = json.load(open(manifest, encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        err(f"{rel}/plugin.json: invalid JSON — {e}")
+        return True
+    if pj.get("name") != name:
+        err(f"{rel}/plugin.json: name {pj.get('name')!r} does not match marketplace entry {name!r}")
+    if pj.get("version") and pj.get("version") not in versions:
+        err(
+            f"{rel}/plugin.json: version {pj['version']!r} is out of sync with the "
+            f"catalog version(s) {sorted(versions)}"
+        )
+
+    if not os.path.isdir(os.path.join(pdir, "skills")):
+        err(f"{rel}: plugin has no skills/ directory")
+    if not os.path.isfile(os.path.join(pdir, "README.md")):
+        err(f"{rel}: plugin has no README.md")
+    return True
+
+
+def plugin_dirs():
+    """Names of the plugin directories under plugins/."""
+    pdir = os.path.join(ROOT, "plugins")
+    if not os.path.isdir(pdir):
+        return []
+    return sorted(
+        d for d in os.listdir(pdir)
+        if os.path.isdir(os.path.join(pdir, d)) and not d.startswith(".")
+    )
+
+
+def discover_skills():
+    """Find every skill and enforce the one-skill-one-plugin layout.
+
+    Skills live only at plugins/<plugin>/skills/<skill>/, as real directories.
+    A symlink or a second same-named directory would put a skill in two
+    plugins, so anyone installing both would load it twice.
+    """
+    if os.path.isdir(os.path.join(ROOT, "skills")):
+        err(
+            "skills/ exists at the repo root. Skills live under "
+            "plugins/<plugin>/skills/<skill>/ — move it into the plugin it belongs to."
+        )
+    plugins = plugin_dirs()
+    if not plugins:
+        err("plugins/ contains no plugins")
+    for p in plugins:
+        sdir = os.path.join(ROOT, "plugins", p, "skills")
+        if not os.path.isdir(sdir):
+            continue
+        entries = sorted(f for f in os.listdir(sdir) if not f.startswith("."))
+        if not entries:
+            err(f"plugins/{p}/skills: plugin contains no skills")
+        for f in entries:
+            path = os.path.join(sdir, f)
+            rel = os.path.relpath(path, ROOT)
+            if os.path.islink(path):
+                err(f"{rel}: must be a real directory, not a symlink — each skill lives in one plugin")
+                continue
+            if not os.path.isdir(path):
+                err(
+                    f"{rel}: loose file under a plugin's skills/; every entry there "
+                    f"must be a skill directory"
+                )
+                continue
+            if f in SKILL_DIRS:
+                err(f"{rel}: skill {f!r} already exists at {SKILL_DIRS[f]} — a skill belongs to exactly one plugin")
+                continue
+            SKILL_DIRS[f] = rel
+    return sorted(SKILL_DIRS)
+
+
+def check_starter_kit_pins():
+    """A starter kit that installs from an external catalog must use its pinned ref.
+
+    Kits reference upstream catalogs by commit so a project gets exactly what this
+    catalog reviewed. Any 40-char SHA on a line of a kit file that mentions a
+    registered catalog's repository must equal that catalog's sourceRef; moving
+    the pin means updating the registry and the kit together. The check is per
+    line so that one README can pin several catalogs.
+    """
+    kits = os.path.join(ROOT, "starter-kits")
+    reg_path = os.path.join(ROOT, "tools", "external-catalogs.json")
+    if not os.path.isdir(kits) or not os.path.isfile(reg_path):
+        return
+    try:
+        catalogs = json.load(open(reg_path, encoding="utf-8")).get("catalogs", [])
+    except json.JSONDecodeError:
+        return  # reported by check_external_catalogs
+    pins = {}
+    for c in catalogs:
+        m = re.match(r"https://github\.com/([^/]+/[^/]+?)/?$", c.get("repository", ""))
+        if m and c.get("sourceRefType") == "commit":
+            pins[m.group(1)] = (c.get("name"), c.get("sourceRef"))
+
+    for dirpath, _, filenames in os.walk(kits):
+        for fn in filenames:
+            if not fn.endswith(TEXT_EXT):
+                continue
+            path = os.path.join(dirpath, fn)
+            body = open(path, encoding="utf-8", errors="replace").read()
+            for i, line in enumerate(body.splitlines(), 1):
+                for slug, (cname, ref) in pins.items():
+                    if slug not in line:
+                        continue
+                    for sha in set(re.findall(r"\b[0-9a-f]{40}\b", line)):
+                        if sha != ref:
+                            err(
+                                f"{os.path.relpath(path, ROOT)}:{i}: pins {slug} at {sha[:12]}..., "
+                                f"but tools/external-catalogs.json ({cname}) pins {ref[:12]}... — "
+                                f"move both together"
+                            )
+
+
+def check_starter_kits():
+    """A starter kit must enable plugins that this marketplace actually offers.
+
+    Kits compose plugins through template/.github/copilot/settings.json. A typo
+    there fails silently for every project created from the kit.
+    """
+    kits = os.path.join(ROOT, "starter-kits")
+    if not os.path.isdir(kits):
+        return
+    mkt = os.path.join(ROOT, ".github", "plugin", "marketplace.json")
+    try:
+        m = json.load(open(mkt, encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return  # reported by check_manifests
+    offered = {f"{p.get('name')}@{m.get('name')}" for p in m.get("plugins", [])}
+
+    for k in sorted(os.listdir(kits)):
+        kdir = os.path.join(kits, k)
+        if not os.path.isdir(kdir) or k.startswith("."):
+            continue
+        rel = os.path.relpath(kdir, ROOT)
+        if not os.path.isfile(os.path.join(kdir, "README.md")):
+            err(f"{rel}: starter kit has no README.md")
+        sp = os.path.join(kdir, "template", ".github", "copilot", "settings.json")
+        if not os.path.isfile(sp):
+            err(f"{rel}: starter kit has no template/.github/copilot/settings.json")
+            continue
+        try:
+            settings = json.load(open(sp, encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            err(f"{os.path.relpath(sp, ROOT)}: invalid JSON — {e}")
+            continue
+        enabled = settings.get("enabledPlugins")
+        if not isinstance(enabled, dict) or not enabled:
+            err(f"{os.path.relpath(sp, ROOT)}: enabledPlugins must be a non-empty map of plugin@marketplace -> true")
+            continue
+        for key in enabled:
+            if key.endswith(f"@{m.get('name')}") and key not in offered:
+                err(f"{os.path.relpath(sp, ROOT)}: enables {key!r}, which the marketplace does not offer")
 
 
 def check_external_tools():
@@ -432,19 +636,20 @@ def check_external_tools():
         # A referenced pointer skill must exist and agree on the pinned ref.
         rel_skill = t.get("relatedSkill")
         if rel_skill:
-            sp = os.path.join(ROOT, "skills", rel_skill, "SKILL.md")
-            if not os.path.isfile(sp):
+            sdir = SKILL_DIRS.get(rel_skill)
+            sp = os.path.join(ROOT, sdir, "SKILL.md") if sdir else ""
+            if not sdir or not os.path.isfile(sp):
                 err(f"external tool {n!r}: relatedSkill {rel_skill!r} does not exist")
             elif ref:
                 body = open(sp, encoding="utf-8").read()
                 if ref not in body:
                     err(
                         f"external tool {n!r}: pinned sourceRef {ref[:12]}... is not present in "
-                        f"skills/{rel_skill}/SKILL.md — the registry and the skill have drifted"
+                        f"{sdir}/SKILL.md — the registry and the skill have drifted"
                     )
                 if repo and repo not in body:
                     err(
-                        f"external tool {n!r}: skills/{rel_skill}/SKILL.md does not link the "
+                        f"external tool {n!r}: {sdir}/SKILL.md does not link the "
                         f"upstream repository"
                     )
 
@@ -621,12 +826,16 @@ def check_readme(skill_names):
         return
     body = open(path, encoding="utf-8").read()
 
-    missing = [n for n in skill_names if f"skills/{n})" not in body]
+    missing = [n for n in skill_names if f"{SKILL_DIRS[n]})" not in body]
     if missing:
         err(
-            f"README.md does not list skill(s): {', '.join(missing)}. "
-            f"Every skill must appear in the skills table."
+            f"README.md does not link skill(s): {', '.join(missing)}. "
+            f"Every skill must appear in the skills table, linked to its plugin path."
         )
+
+    for p in plugin_dirs():
+        if f"(plugins/{p})" not in body:
+            err(f"README.md: Plugins table does not link plugins/{p}")
 
     for category in sorted({c for c in SKILL_CATEGORIES.values() if c}):
         if category not in body:
@@ -636,39 +845,18 @@ def check_readme(skill_names):
 
 
 def main():
-    skills_root = os.path.join(ROOT, "skills")
-    if not os.path.isdir(skills_root):
-        err("skills/ directory is missing")
-    else:
-        found = sorted(
-            d
-            for d in os.listdir(skills_root)
-            if os.path.isdir(os.path.join(skills_root, d)) and not d.startswith(".")
-        )
-        # A loose file directly under skills/ is almost always a mistake — it is
-        # silently ignored by the per-skill walk below, so it gets called out
-        # rather than quietly doing nothing.
-        strays = sorted(
-            f
-            for f in os.listdir(skills_root)
-            if not os.path.isdir(os.path.join(skills_root, f)) and not f.startswith(".")
-        )
-        if strays:
-            err(
-                f"skills/ contains loose file(s) that are not skills: "
-                f"{', '.join(strays)}. Every entry under skills/ must be a skill "
-                f"directory; repo-level files belong at the repository root."
-            )
-        if not found:
-            err("skills/ contains no skills")
-        for d in found:
-            check_skill(os.path.join(skills_root, d))
-        print(f"checked {len(found)} skill(s): {', '.join(found)}")
+    found = discover_skills()
+    for d in found:
+        check_skill(os.path.join(ROOT, SKILL_DIRS[d]))
+    print(f"checked {len(found)} skill(s): {', '.join(found)}")
+    if found:
         check_readme(found)
 
     check_manifests()
     check_external_tools()
     check_external_catalogs()
+    check_starter_kits()
+    check_starter_kit_pins()
 
     for w in warnings:
         print(f"WARN  {w}")

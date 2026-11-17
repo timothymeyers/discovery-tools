@@ -1,0 +1,21 @@
+{
+  "name": "discovery-project-bundle",
+  "version": "0.9.0",
+  "description": "Stable skills for running one Microsoft Discovery project: watch outcome grades and the task board, read engine runs as a chat, report token usage, and gather the project's exhaust (transcripts, logs, telemetry) into the project folder.",
+  "author": {
+    "name": "Tim Meyers",
+    "url": "https://github.com/timothymeyers"
+  },
+  "homepage": "https://github.com/timothymeyers/discovery-tools/tree/main/plugins/discovery-project-bundle",
+  "repository": "https://github.com/timothymeyers/discovery-tools",
+  "license": "MIT",
+  "keywords": [
+    "microsoft-discovery",
+    "ai-for-science",
+    "project-status",
+    "observability",
+    "token-usage",
+    "engine-chat",
+    "exhaust"
+  ]
+}

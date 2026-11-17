@@ -1,10 +1,13 @@
 {
   "extraKnownMarketplaces": {
     "discovery-tools": {
-      "source": "timothymeyers/discovery-tools"
+      "source": {
+        "source": "github",
+        "repo": "timothymeyers/discovery-tools"
+      }
     }
   },
-  "enabledPlugins": [
-    "discovery-tools@discovery-tools"
-  ]
+  "enabledPlugins": {
+    "discovery-tools@discovery-tools": true
+  }
 }

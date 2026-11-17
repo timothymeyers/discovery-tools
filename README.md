@@ -4,14 +4,14 @@
 
 This repo is a catalog. It is simultaneously:
 
-- an **[Agent Skills](https://agentskills.io/specification)** source — every skill under
-  `skills/` is individually installable into ~50 agent hosts with `gh skill install`
 - a **Copilot CLI plugin marketplace** — `copilot plugin marketplace add timothymeyers/discovery-tools`
 - a **Claude Code plugin marketplace** — `/plugin marketplace add timothymeyers/discovery-tools`
+- an **[Agent Skills](https://agentskills.io/specification)** source — every skill is
+  individually installable into ~50 agent hosts with `gh skill install`
 
-Everything works from a single physical copy of each skill: the plugin root is the repo
-root, so `skills/` satisfies both the Agent Skills distribution convention and the plugin
-component layout. No symlinks, no duplication, no build step.
+Start with a [plugin](#plugins) or a [starter kit](#starter-kits). Each skill lives in
+exactly one plugin, at `plugins/<plugin>/skills/<skill>/`, and the `discovery-tools`
+plugin installs all of them.
 
 ---
 
@@ -25,32 +25,36 @@ and agents can tell at a glance whether it is relevant to their domain.
 
 #### Life sciences
 
-| Skill | Ver | Subfield | Also relevant to | What it does |
-|---|---|---|---|---|
-| [`alphafold-structure-provenance`](skills/alphafold-structure-provenance) | 1 | Structural and computational biology | Biophysics (diffusion values computed from structures) | Taxon-scoped UniProt lookup plus version-aware AlphaFold DB retrieval. Keeps pLDDT/PAE triage separate from assembly flags and records which structure version a derived quantity came from. |
-| [`biochemical-identifier-crosswalk`](skills/biochemical-identifier-crosswalk) | 1 | Biochemistry / bioinformatics | Chemistry (formula, charge and mass balance checks) | Reconciles reactions, compounds, proteins, and taxa across Rhea, ChEBI, MetaNetX, and UniProt without collapsing ambiguity. Verifies mass and charge balance. |
-| [`biocyc-network-context`](skills/biocyc-network-context) | 1 | Systems biology / metabolic networks | Genomics (gene-reaction links) | Bounded BioCyc/EcoCyc/CyanoCyc traversal: reaction → enzyme/complex → gene → pathway. Preserves isoenzymes, expands complexes, distinguishes a missing frame from a gated one. |
-| [`brenda-enzyme-data`](skills/brenda-enzyme-data) | 1 | Enzymology | — | Extracts and canonicalizes enzyme kinetics from a **caller-supplied licensed** BRENDA bulk JSON. Never bundles, downloads, or accepts the license for any dump. |
-| [`sabio-rk-kinetics`](skills/sabio-rk-kinetics) | 1 | Enzymology / biochemical kinetics | Physical sciences (chemical kinetics) | Ingests SABIO-RK kinetic laws with organism/genus/EC query tiering and taxid-ancestry fallback. Never conflates a confirmed-empty result with a transport or auth failure. |
+| Skill | Plugin | Ver | Subfield | Also relevant to | What it does |
+|---|---|---|---|---|---|
+| [`alphafold-structure-provenance`](plugins/life-sciences-labs/skills/alphafold-structure-provenance) | [`life-sciences-labs`](plugins/life-sciences-labs) | 1 | Structural and computational biology | Biophysics (diffusion values computed from structures) | Taxon-scoped UniProt lookup plus version-aware AlphaFold DB retrieval. Keeps pLDDT/PAE triage separate from assembly flags and records which structure version a derived quantity came from. |
+| [`biochemical-identifier-crosswalk`](plugins/life-sciences-labs/skills/biochemical-identifier-crosswalk) | [`life-sciences-labs`](plugins/life-sciences-labs) | 1 | Biochemistry / bioinformatics | Chemistry (formula, charge and mass balance checks) | Reconciles reactions, compounds, proteins, and taxa across Rhea, ChEBI, MetaNetX, and UniProt without collapsing ambiguity. Verifies mass and charge balance. |
+| [`biocyc-network-context`](plugins/life-sciences-labs/skills/biocyc-network-context) | [`life-sciences-labs`](plugins/life-sciences-labs) | 1 | Systems biology / metabolic networks | Genomics (gene-reaction links) | Bounded BioCyc/EcoCyc/CyanoCyc traversal: reaction → enzyme/complex → gene → pathway. Preserves isoenzymes, expands complexes, distinguishes a missing frame from a gated one. |
+| [`brenda-enzyme-data`](plugins/life-sciences-labs/skills/brenda-enzyme-data) | [`life-sciences-labs`](plugins/life-sciences-labs) | 1 | Enzymology | — | Extracts and canonicalizes enzyme kinetics from a **caller-supplied licensed** BRENDA bulk JSON. Never bundles, downloads, or accepts the license for any dump. |
+| [`sabio-rk-kinetics`](plugins/life-sciences-labs/skills/sabio-rk-kinetics) | [`life-sciences-labs`](plugins/life-sciences-labs) | 1 | Enzymology / biochemical kinetics | Physical sciences (chemical kinetics) | Ingests SABIO-RK kinetic laws with organism/genus/EC query tiering and taxid-ancestry fallback. Never conflates a confirmed-empty result with a transport or auth failure. |
 
 #### Cross-domain
 
-| Skill | Ver | Subfield | Also relevant to | What it does |
-|---|---|---|---|---|
-| [`build-research-paper`](skills/build-research-paper) | 2 | Scientific writing and publication | — | Builds publication-quality, arxiv-ready PDFs from LaTeX or Markdown + figures via `tectonic` or `pandoc`. Ships templates, a scaffolder, and referee-revision scaffolding. |
-| [`discovery-add-agents`](skills/discovery-add-agents) | 1.16.0 | Research platform engineering | — | Adds agents from the public `microsoft/discovery` repo, then deploys to one target: local Copilot `.agent.md` companions, a Discovery project + Azure, or promoting a local agent up. |
-| [`discovery-clarify-project`](skills/discovery-clarify-project) | 1 | Research methodology and experiment design | — | Pre-flights a Discovery project before any task runs: reads purpose, outcomes, and task list, then asks up to 5 course-correcting clarifying questions. Clarifies only — never starts the work. |
-| [`discovery-dashboard`](skills/discovery-dashboard) | 2 | Research platform observability | — | Read-only live operations dashboard for a Discovery workspace: progress, work front, engine liveness, agent runs, CLIO investigations, and an explicit coverage panel. |
-| [`chat-session-experimental`](skills/chat-session-experimental) | 0.1.0-experimental | Research platform observability | — | Finds, views, and archives the Copilot chat sessions (VS Code / Discovery App and Copilot CLI/SDK/engine) that belong to a project; renders any session as a single-page chat viewer. |
-| [`engine-chat-experimental`](skills/engine-chat-experimental) | 0.2.0-experimental | Research platform observability | — | Installs and launches a local, read-only Engine Chat view for Discovery engine runs, including per-agent session views, status-first reuse/repair flows, and integrated-browser routing. |
-| [`discovery-design-tasks`](skills/discovery-design-tasks) | 1 | Research methodology and experiment design | — | Generates a Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
-| [`discovery-gather-exhaust`](skills/discovery-gather-exhaust) | 1 | Research platform observability | — | Gathers a project's exhaust from outside the project folder (Copilot session transcripts, editor chats, process/app logs, telemetry) into `.discovery/exhaust/`, scrubs it to a chosen privacy level, handles large files, and commits it. Dry run by default; never deletes or pushes. |
-| [`discovery-project-story`](skills/discovery-project-story) | 1 | Research communication and storytelling | Research platform observability | Turns a Discovery project's own record into an evidence-true, animated, self-contained HTML replay of how the work happened. Scene count comes from the evidence and needs approval; every human quote is exact and re-verified at build time. |
-| [`discovery-status-board`](skills/discovery-status-board) | 1 | Research platform observability | — | Read-only status board for a Discovery project: outcome chips colored red/yellow/green from their latest rubric grade, plus a kanban of leaf tasks in swimlanes that follow the task hierarchy, with waiting reasons and not-ready dependencies. |
-| [`discovery-token-usage`](skills/discovery-token-usage) | 1 | Research platform observability | — | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines, models, and interactive chat. Handles seven known data-quality traps. Cost reporting is opt-in. |
-| [`osti-literature-search`](skills/osti-literature-search) | 1 | Scientific literature retrieval | — | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
-| [`scientific-database-access`](skills/scientific-database-access) | 1 | Research data access and provenance | Life sciences (current source cards are bio databases) | Establishes a working, authorized, versioned route to a scientific database **before** declaring it inaccessible. Use before writing an adapter or designing a fallback. |
-| [`scientific-evidence-qc`](skills/scientific-evidence-qc) | 1 | Data quality and reproducibility | Life sciences (examples use reaction evidence) | Auditable append-only observation layer and coverage/QC reporting over merged scientific evidence. Use before trusting an existing "N/N passed" QC summary. |
+| Skill | Plugin | Ver | Subfield | Also relevant to | What it does |
+|---|---|---|---|---|---|
+| [`discovery-add-agents`](plugins/discovery-flexible-setup/skills/discovery-add-agents) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 1.16.0 | Research platform engineering | — | Adds agents from the public `microsoft/discovery` repo, then deploys to one target: local Copilot `.agent.md` companions, a Discovery project + Azure, or promoting a local agent up. |
+| [`discovery-clarify-project`](plugins/discovery-flexible-setup/skills/discovery-clarify-project) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 1 | Research methodology and experiment design | — | Pre-flights a Discovery project before any task runs: reads purpose, outcomes, and task list, then asks up to 5 course-correcting clarifying questions. Clarifies only — never starts the work. |
+| [`discovery-curate-bookshelf`](plugins/discovery-flexible-setup/skills/discovery-curate-bookshelf) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 0.1.0 | Research data management | — | Places a project's sources: documents into Bookshelf shelves (staged until a shelf exists), datasets into `data/` with a manifest, and databases/APIs into `data/external-sources.md`. Asks before copying anything over 50 MB. |
+| [`discovery-dashboard`](plugins/discovery-tim-labs/skills/discovery-dashboard) | [`discovery-tim-labs`](plugins/discovery-tim-labs) | 2 | Research platform observability | — | Read-only live operations dashboard for a Discovery workspace: progress, work front, engine liveness, agent runs, CLIO investigations, and an explicit coverage panel. |
+| [`chat-session-experimental`](plugins/discovery-tim-labs/skills/chat-session-experimental) | [`discovery-tim-labs`](plugins/discovery-tim-labs) | 0.1.0-experimental | Research platform observability | — | Finds, views, and archives the Copilot chat sessions (VS Code / Discovery App and Copilot CLI/SDK/engine) that belong to a project; renders any session as a single-page chat viewer. |
+| [`discovery-define-outcomes`](plugins/discovery-flexible-setup/skills/discovery-define-outcomes) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 0.1.0 | Research methodology and experiment design | — | Drafts, tightens, adds, or supersedes a project's measurable Outcomes, each with a type, evidence criterion, source citation, and draft rubric. Never deletes. |
+| [`discovery-project-setup`](plugins/discovery-flexible-setup/skills/discovery-project-setup) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 0.1.0 | Research platform engineering | — | Sets up or re-plans a Discovery project with propose → approve → apply and a git ledger: Purpose, data intake, Outcomes, tasks, and agents/skills/tools. From a grant or proposal, or step by step. Never deletes. |
+| [`discovery-provision-tools`](plugins/discovery-flexible-setup/skills/discovery-provision-tools) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 0.1.0 | Research platform engineering | — | Recommends and installs the agents, skills, MCP servers, and A2A agents a project needs, from user-supplied sources and catalogs. Ties each to a task or access gap and shows a trust review first. |
+| [`engine-chat-experimental`](plugins/discovery-project-bundle/skills/engine-chat-experimental) | [`discovery-project-bundle`](plugins/discovery-project-bundle) | 0.2.0-experimental | Research platform observability | — | Installs and launches a local, read-only Engine Chat view for Discovery engine runs, including per-agent session views, status-first reuse/repair flows, and integrated-browser routing. |
+| [`discovery-design-tasks`](plugins/discovery-cape-labs/skills/discovery-design-tasks) | [`discovery-cape-labs`](plugins/discovery-cape-labs) | 1 | Research methodology and experiment design | — | Generates a Discovery `task-design.md` using the Deterministic, Guided Exploration, or Autonomous Research investigation patterns. Never overwrites an existing design. |
+| [`discovery-gather-exhaust`](plugins/discovery-project-bundle/skills/discovery-gather-exhaust) | [`discovery-project-bundle`](plugins/discovery-project-bundle) | 1 | Research platform observability | — | Gathers a project's exhaust from outside the project folder (Copilot session transcripts, editor chats, process/app logs, telemetry) into `.discovery/exhaust/`, scrubs it to a chosen privacy level, handles large files, and commits it. Dry run by default; never deletes or pushes. |
+| [`discovery-project-story`](plugins/discovery-tim-labs/skills/discovery-project-story) | [`discovery-tim-labs`](plugins/discovery-tim-labs) | 1 | Research communication and storytelling | Research platform observability | Turns a Discovery project's own record into an evidence-true, animated, self-contained HTML replay of how the work happened. Scene count comes from the evidence and needs approval; every human quote is exact and re-verified at build time. |
+| [`discovery-status-board`](plugins/discovery-project-bundle/skills/discovery-status-board) | [`discovery-project-bundle`](plugins/discovery-project-bundle) | 1 | Research platform observability | — | Read-only status board for a Discovery project: outcome chips colored red/yellow/green from their latest rubric grade, plus a kanban of leaf tasks in swimlanes that follow the task hierarchy, with waiting reasons and not-ready dependencies. |
+| [`discovery-token-usage`](plugins/discovery-project-bundle/skills/discovery-token-usage) | [`discovery-project-bundle`](plugins/discovery-project-bundle) | 1 | Research platform observability | — | Mines a Discovery workspace's `.discovery/` exhaust for token usage across engines, models, and interactive chat. Handles seven known data-quality traps. Cost reporting is opt-in. |
+| [`discovery-work-breakdown`](plugins/discovery-flexible-setup/skills/discovery-work-breakdown) | [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | 0.1.0 | Research methodology and experiment design | — | Builds or re-plans the task tree from Purpose, Outcomes, rubrics, and existing tasks: as many leaves as needed, validation on every task, dependencies, suggested execution patterns, human-in-the-loop pauses before safety or cost risks, and HPC/cloud compute plans. Shows the shape for approval before creating tasks. |
+| [`osti-literature-search`](plugins/general-science-labs/skills/osti-literature-search) | [`general-science-labs`](plugins/general-science-labs) | 1 | Scientific literature retrieval | — | Searches and retrieves DOE-funded literature from OSTI.GOV. **Pointer skill** — drives the external `osti-axi` CLI, which is not bundled here. |
+| [`scientific-database-access`](plugins/general-science-labs/skills/scientific-database-access) | [`general-science-labs`](plugins/general-science-labs) | 1 | Research data access and provenance | Life sciences (current source cards are bio databases) | Establishes a working, authorized, versioned route to a scientific database **before** declaring it inaccessible. Use before writing an adapter or designing a fallback. |
+| [`scientific-evidence-qc`](plugins/general-science-labs/skills/scientific-evidence-qc) | [`general-science-labs`](plugins/general-science-labs) | 1 | Data quality and reproducibility | Life sciences (examples use reaction evidence) | Auditable append-only observation layer and coverage/QC reporting over merged scientific evidence. Use before trusting an existing "N/N passed" QC summary. |
 
 ### External tools
 
@@ -67,7 +71,7 @@ derived from reading the pinned tree and nothing was executed.
 | Tool | Author | License | Pointer skill |
 |---|---|---|---|
 | [`hullrad-axi`](https://github.com/davenovelli-pnnl/hullrad-axi) — hydrodynamic properties (mass, translational/rotational diffusion) from a PDB or mmCIF structure, wrapping HullRad 10.2 | Dave Novelli (PNNL) | MIT AND Unlicense | — |
-| [`osti-axi`](https://github.com/davenovelli-pnnl/osti-axi) — OSTI.GOV search and full-text retrieval CLI for agents | Dave Novelli (PNNL) | MIT | [`osti-literature-search`](skills/osti-literature-search) |
+| [`osti-axi`](https://github.com/davenovelli-pnnl/osti-axi) — OSTI.GOV search and full-text retrieval CLI for agents | Dave Novelli (PNNL) | MIT | [`osti-literature-search`](plugins/general-science-labs/skills/osti-literature-search) |
 
 The machine-readable registry is [`tools/external-tools.json`](tools/external-tools.json).
 It is the source of truth: it carries the pinned commit, runtime prerequisites,
@@ -90,6 +94,7 @@ nothing from them.
 | Catalog | Author | License | Layout |
 |---|---|---|---|
 | [`genesis-skills`](https://gitlab.osti.gov/genesis/genesis-skills/) — Agent Skills for science and engineering from the DOE **Genesis Mission**: HPC job submission (Slurm, PBS, Aurora, Frontier, Perlmutter), plasma simulation (Gkeyll, GS2), scientific-data metadata and schemas, AI evaluation, AI safety, research data-movement APIs, literature search, multi-agent systems | ModCon / Genesis Mission | **Mixed — per skill** (root BSD-2-Clause) | Mostly scoped (`skills/<scope>/<skill>/`), some flat — `gh skill install`-able (29 of 36) |
+| [`microsoft-discovery`](https://github.com/microsoft/discovery) — Microsoft's public Discovery catalog: 120+ containerized science agents, domain starter kits, QuickStart scenarios, and nine Agent Skills (agent and kit deployers, QuickStart runner, token estimator, paper builder) | Microsoft | MIT | Flat `skills/<skill>/` plus hidden `.github/skills/<skill>/` (needs `--allow-hidden-dirs`) — `gh skill install`-able |
 
 The link above is the OSTI GitLab project, which is a **read-only mirror**. Its
 own README designates [`AI-ModCon/genesis-skills`](https://github.com/AI-ModCon/genesis-skills)
@@ -127,6 +132,16 @@ that explores the catalog in place without copying anything. **Prefer a
 per-skill `gh skill install`, or `skill-search` when you only want to look** —
 installing 36 unreviewed skills to obtain one is not a reasonable trade.
 
+**microsoft-discovery** overlaps with this catalog. Upstream `build-research-paper`
+is now the canonical version, and this catalog retired its copy in 0.9.0 (see
+[Retired skills](#retired-skills)). Upstream `add-example-agents` and
+`discovery-design-tasks` match our `discovery-add-agents` and `discovery-design-tasks`
+(ours scrub an internal registry name and add catalog metadata); prefer ours for now.
+The [`discovery-project-starter`](starter-kits/discovery-project-starter) kit links
+this catalog at
+[`d424c9e`](https://github.com/microsoft/discovery/tree/d424c9e7e6b769fdfdbe0c63bea4ad8ff7a82ecf)
+and installs nothing from it.
+
 The machine-readable registry is [`tools/external-catalogs.json`](tools/external-catalogs.json),
 which carries the pinned refs, the per-subtree licensing notes, the domain
 inventory, and safety metadata.
@@ -150,13 +165,68 @@ inventory, and safety metadata.
 
 None yet. Custom agents will live in `agents/` as `*.agent.md`.
 
+### Plugins
+
+Each skill belongs to exactly one plugin. Plugins can't depend on each other, so
+`discovery-tools` is the one that installs everything; to combine a few, use a
+[starter kit](#starter-kits).
+
+| Plugin | Status | Skills | For |
+|---|---|---|---|
+| [`discovery-project-bundle`](plugins/discovery-project-bundle) | Stable | `discovery-status-board`, `engine-chat-experimental`, `discovery-token-usage`, `discovery-gather-exhaust` | Running one Discovery project: watch it and keep its records |
+| [`discovery-flexible-setup`](plugins/discovery-flexible-setup) | Stable | `discovery-project-setup`, `discovery-curate-bookshelf`, `discovery-define-outcomes`, `discovery-provision-tools`, `discovery-work-breakdown`, `discovery-clarify-project`, `discovery-add-agents` | Setting up or re-planning a project: Purpose, data, Outcomes, tasks, and agents/tools, propose-then-apply |
+| [`discovery-tim-labs`](plugins/discovery-tim-labs) | Labs | `discovery-dashboard`, `discovery-project-story`, `chat-session-experimental` | Skills being tried out; they move to a stable plugin once proven |
+| [`discovery-cape-labs`](plugins/discovery-cape-labs) | Labs | `discovery-design-tasks` | Designing one investigation in detail for a specific agent set |
+| [`life-sciences-labs`](plugins/life-sciences-labs) | Labs | `sabio-rk-kinetics`, `brenda-enzyme-data`, `biocyc-network-context`, `alphafold-structure-provenance`, `biochemical-identifier-crosswalk` | Life-sciences data |
+| [`general-science-labs`](plugins/general-science-labs) | Labs | `scientific-database-access`, `scientific-evidence-qc`, `osti-literature-search` | Database access, evidence QC, and literature search in any field |
+| `discovery-tools` | — | All of the above | Everything in this catalog |
+
+When a labs skill is promoted, it moves to its new plugin and the release notes
+say so. If you installed the labs plugin, install the new one to keep the skill.
+
 ### Starter kits
 
-None yet. See [`starter-kits/`](starter-kits).
+| Kit | What it sets up |
+|---|---|
+| [`discovery-project-starter`](starter-kits/discovery-project-starter) | Turns on `discovery-project-bundle` for the project, and links the microsoft/discovery and genesis-skills catalogs at their pinned commits |
+
+### Retired skills
+
+| Skill | Retired in | Use instead |
+|---|---|---|
+| `build-research-paper` | 0.9.0 | The canonical version in [microsoft/discovery](https://github.com/microsoft/discovery/tree/d424c9e7e6b769fdfdbe0c63bea4ad8ff7a82ecf/skills/build-research-paper): `gh skill install microsoft/discovery skills/build-research-paper --pin d424c9e7e6b769fdfdbe0c63bea4ad8ff7a82ecf` |
 
 ---
 
 ## Install
+
+> [!IMPORTANT]
+> **For AI agents asked to "install a plugin" from this repo:** install it through
+> the host's plugin system, using the steps for your host below. **Do not copy
+> `plugins/<plugin>/skills/` folders into the project.** A copy is not a plugin: it
+> won't update, can't be disabled as a unit, and duplicates skills if the plugin is
+> installed later. Copy skills only when the user explicitly asks for a manual copy.
+
+### Microsoft Discovery App / VS Code — plugins
+
+The Discovery App is built on VS Code, which installs agent plugins from marketplaces
+listed in the **user** setting `chat.plugins.marketplaces`. Workspace settings and
+`.github/copilot/settings.json` are not read for this.
+
+1. Add this marketplace to your user `settings.json` (Command Palette →
+   **Preferences: Open User Settings (JSON)**), keeping the defaults:
+
+   ```json
+   "chat.plugins.marketplaces": [
+     "github/copilot-plugins",
+     "github/awesome-copilot#marketplace",
+     "timothymeyers/discovery-tools"
+   ]
+   ```
+
+   To try an unreleased branch, use `timothymeyers/discovery-tools#<branch>`.
+2. Command Palette → **Chat: Plugins** (or search `@agentPlugins` in the Extensions
+   view), find the plugin, for example `discovery-project-bundle`, and install it.
 
 ### Any agent — individual skills
 
@@ -200,7 +270,16 @@ Or skip the marketplace entirely:
 copilot plugin install timothymeyers/discovery-tools
 ```
 
-In VS Code: Extensions view → search `@agentPlugins`, or Command Palette → **Chat: Plugins**.
+In the Discovery App or VS Code, see [Microsoft Discovery App / VS Code — plugins](#microsoft-discovery-app--vs-code--plugins).
+
+### GitHub Copilot CLI — one plugin
+
+Pick a plugin from the [Plugins](#plugins) table:
+
+```bash
+copilot plugin marketplace add timothymeyers/discovery-tools
+copilot plugin install discovery-project-bundle@discovery-tools
+```
 
 ### Claude Code — full plugin
 
@@ -212,20 +291,26 @@ In VS Code: Extensions view → search `@agentPlugins`, or Command Palette → *
 ### Team-wide (no per-developer commands)
 
 Commit this to your own repo at `.github/copilot/settings.json`. Copilot CLI, the Copilot
-cloud agent, and Copilot code review all pick it up automatically:
+cloud agent, and Copilot code review all pick it up automatically. Turn on any plugins
+from the [Plugins](#plugins) table, or start from a [starter kit](#starter-kits):
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "discovery-tools": { "source": "timothymeyers/discovery-tools" }
+    "discovery-tools": {
+      "source": { "source": "github", "repo": "timothymeyers/discovery-tools" }
+    }
   },
-  "enabledPlugins": ["discovery-tools@discovery-tools"]
+  "enabledPlugins": {
+    "discovery-project-bundle@discovery-tools": true
+  }
 }
 ```
 
-### Manual
+### Manual (only when asked)
 
-Copy any `skills/<name>/` directory into one of the locations your agent scans:
+This is a copy, not a plugin install; prefer the plugin routes above. Copy any
+`plugins/<plugin>/skills/<name>/` directory into one of the locations your agent scans:
 
 | Scope | Locations |
 |---|---|
@@ -258,16 +343,22 @@ prompt you before running anything. Report issues per [SECURITY.md](SECURITY.md)
 
 ```
 discovery-tools/
-├── plugin.json                     # plugin manifest — plugin root IS the repo root
-├── skills/<name>/SKILL.md          # the catalog; installable via `gh skill install`
-├── tools/external-tools.json       # registry of external tools (pointers, never vendored)
-├── tools/external-catalogs.json    # registry of external skill catalogs (pointers too)
-├── agents/<name>.agent.md          # custom agents (none yet)
-├── starter-kits/<name>/            # project scaffolds (none yet)
-├── .github/plugin/marketplace.json # Copilot CLI marketplace manifest
-├── .claude-plugin/marketplace.json # byte-identical copy for Claude Code; CI enforces sync
-└── .github/copilot/settings.json   # this repo dogfoods its own plugin
+├── plugin.json                       # the discovery-tools plugin: lists every plugins/*/skills/
+├── plugins/<plugin>/
+│   ├── plugin.json                   # one installable plugin
+│   ├── README.md
+│   └── skills/<skill>/SKILL.md       # each skill lives in exactly one plugin
+├── starter-kits/<kit>/               # project templates that turn on several plugins
+├── tools/external-tools.json         # registry of external tools (pointers, never vendored)
+├── tools/external-catalogs.json      # registry of external skill catalogs (pointers too)
+├── agents/<name>.agent.md            # custom agents (none yet)
+├── .github/plugin/marketplace.json   # Copilot CLI marketplace manifest
+├── .claude-plugin/marketplace.json   # byte-identical copy for Claude Code; CI enforces sync
+└── .github/copilot/settings.json     # this repo dogfoods its own plugin
 ```
+
+`gh skill install` finds skills nested under `plugins/<plugin>/skills/`, so
+`gh skill install timothymeyers/discovery-tools <skill>` works by name.
 
 Why `.claude-plugin/marketplace.json` is a real file rather than a symlink (which is what
 `github/copilot-plugins` uses): git symlinks degrade to plain text files on Windows clones
@@ -308,8 +399,9 @@ resolves `skill@v1.2.0` from releases, not from frontmatter.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). New skills go in `skills/<name>/SKILL.md` with the
-`name` field matching the directory name.
+See [CONTRIBUTING.md](CONTRIBUTING.md). New skills go in
+`plugins/<plugin>/skills/<name>/SKILL.md` with the `name` field matching the directory
+name. New, unproven skills usually start in a labs plugin.
 
 ## Why not GitHub Marketplace?
 
